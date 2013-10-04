@@ -41,16 +41,16 @@ make_command_stream (int (*get_next_byte) (void *),
   for(; i<8; i++) {
     stream_t->string_array[i] = malloc(100*sizeof(char));
   }
-  //stream_t->string_array[0] = "true";
-  //stream_t->string_array[1] = "g++ -c foo.c";
-  //stream_t->string_array[2] = ": : :";
-  stream_t->string_array[0] = "cat < /etc/passwd | tr a-z A-Z | sort -u || echo sort failed!";
-  stream_t->string_array[1] = "a b<c > d";
-  stream_t->string_array[2] = "cat < /etc/passwd | tr a-z A-Z | sort -u > out || echo sort failed!";
-  stream_t->string_array[3] = "a&&b||c &&d | e && f| g<h";
-  stream_t->string_array[4] = "a<b>c|d<e>f|g<h>i";
+  stream_t->string_array[0] = "true";
+  stream_t->string_array[1] = "g++ -c foo.c";
+  stream_t->string_array[2] = ": : :";
+  stream_t->string_array[3] = "cat < /etc/passwd | tr a-z A-Z | sort -u || echo sort failed!";
+  stream_t->string_array[4] = "a b<c > d";
+  stream_t->string_array[5] = "cat < /etc/passwd | tr a-z A-Z | sort -u > out || echo sort failed!";
+  stream_t->string_array[6] = "a&&b||c &&d | e && f| g<h";
+  stream_t->string_array[7] = "a<b>c|d<e>f|g<h>i";
   stream_t->command_position = 0;
-  stream_t->array_size = 5;
+  stream_t->array_size = 8;
   /*stream_t = (command_stream_t) malloc(sizeof(command_stream_t));
   stream_t->array_size = 1;
   stream_t->command_position = 0;
@@ -99,7 +99,35 @@ parse_command_stream (char* test) {
   *cmd->u.word = malloc(sizeof(start_ptr));
   //printf("Test %s", test);
   //Split left and right side commands to be put in union. command[]
-  if(pipe != NULL && *(++pipe) != '|') {
+  int found = 0;
+  char* and_token = strrchr(pos_ptr, '&');
+  char* temp_or = strstr(pos_ptr, "||");
+  char* or_token = NULL;
+  while(temp_or != NULL) {
+    or_token = temp_or;
+    temp_or = strstr(temp_or+2, "||");
+  }
+  int or_found = 0;
+  int subtract = 0;
+  char* in_token = strrchr(pos_ptr, '>');
+  char* out_token = strrchr(pos_ptr, '<');
+  if(pipe == NULL && and_token == NULL && or_token == NULL && in_token == NULL && out_token == NULL && found == 0) {
+    cmd->type = SIMPLE_COMMAND;
+    strncpy(*cmd->u.word, start_ptr, strlen(start_ptr)); 
+  } else if(and_token != NULL || or_token != NULL) {
+    if(and_token == NULL || (and_token != NULL && or_token != NULL && ((and_token - or_token) < 0))) {
+      left = read_part_command(start_ptr, or_token);
+      right = read_part_command(or_token+2, end_ptr);
+      cmd->type = OR_COMMAND;
+    } else {
+      left = read_part_command(start_ptr, and_token-1);
+      right = read_part_command(and_token+1, end_ptr);
+      cmd->type = AND_COMMAND;
+    }
+    cmd->u.command[0] = parse_command_stream(left);
+    cmd->u.command[1] = parse_command_stream(right);
+    found = 1;
+  } else if(pipe != NULL && *(++pipe) != '|') {
     pipe--;
     left = read_part_command(start_ptr, pipe);
     right = read_part_command(pipe+1, end_ptr);
@@ -107,46 +135,21 @@ parse_command_stream (char* test) {
     cmd->status = -1;
     cmd->u.command[0] = parse_command_stream(left);
     cmd->u.command[1] = parse_command_stream(right);
-  } else {
-    int found = 0;
-    char* and_token = strchr(pos_ptr, '&');
-    char* or_token = strchr(pos_ptr, '|');
-    char* in_token = strchr(pos_ptr, '>');
-    char* out_token = strchr(pos_ptr, '<');
-    if(and_token != NULL || or_token != NULL) {
-      if(and_token - or_token > 0) {
-        left = read_part_command(start_ptr, and_token);
-        right = read_part_command(and_token+2, end_ptr);
-        cmd->type = AND_COMMAND;
-      } else {
-        left = read_part_command(start_ptr, or_token);
-        right = read_part_command(or_token+2, end_ptr);
-        cmd->type = OR_COMMAND;
-      }
-      cmd->u.command[0] = parse_command_stream(left);
-      cmd->u.command[1] = parse_command_stream(right);
-      found = 1;
-    } else if(in_token != NULL || out_token != NULL) {
-        cmd->type = SIMPLE_COMMAND;
-      if(out_token - in_token > 0) {
-        left = read_part_command(start_ptr, out_token);
-        right = read_part_command(out_token+1, end_ptr);
-        cmd->input = malloc(sizeof(start_ptr));
-        strncpy(cmd->input, right, strlen(right));
-      } else {
-        left = read_part_command(start_ptr, in_token);
-        right = read_part_command(in_token+1, end_ptr);
-        cmd->output = malloc(sizeof(start_ptr));
-        strncpy(cmd->output, right, strlen(right));
-      }
-      strncpy(*cmd->u.word, left, strlen(left));
-      found = 1;
+  } else if(in_token != NULL || out_token != NULL) {
+    cmd->type = SIMPLE_COMMAND;
+    if(out_token - in_token > 0) {
+      left = read_part_command(start_ptr, out_token);
+      right = read_part_command(out_token+1, end_ptr);
+      cmd->input = malloc(sizeof(start_ptr));
+      strncpy(cmd->input, right, strlen(right));
+    } else {
+      left = read_part_command(start_ptr, in_token);
+      right = read_part_command(in_token+1, end_ptr);
+      cmd->output = malloc(sizeof(start_ptr));
+      strncpy(cmd->output, right, strlen(right));
     }
-    //No tokens found
-    if(found == 0) {
-      cmd->type = SIMPLE_COMMAND;
-      strncpy(*cmd->u.word, start_ptr, strlen(start_ptr)); 
-    }
+    strncpy(*cmd->u.word, left, strlen(left));
+    found = 1;
   }
   return cmd;
 }
