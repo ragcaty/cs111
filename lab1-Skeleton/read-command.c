@@ -1,4 +1,3 @@
-=======
 // UCLA CS 111 Lab 1 command reading
 
 #include "command.h"
@@ -18,9 +17,10 @@ struct command_stream
   char **full_commands;
 }stream;
 
-
 static command_stream_t stream_t = &stream;
 
+
+//Function helps determine if char is valid, but not a special token
 int is_valid_character(int input)
 {
   if((input >= 'a' && input <= 'z') || (input >= 'A' && input <= 'Z') || (input >= '0' && input <= '9') || (input == '!') || (input == '%') || (input == '+') || (input ==',') | (input == '-') || (input == '.') || (input == '/') || (input == ':') || (input == '@') || (input == '^') || (input == '_'))
@@ -33,322 +33,274 @@ int is_valid_character(int input)
     }
 }
 
-int is_valid_token(int input)
-{
-  if(input == ';' || input == '|' || input == '&' || input == '(' || input == ')' || input == '<' || input == '>')
-    {
+//Function helps check left side of special tokens for validity
+int check_left_valid(char* start, char* end) {
+  while(end != start) {
+    end--;
+    if(*end == ' ' || *end == '\t') 
+      continue;
+    else if(*end == ')' || is_valid_character(*end)) 
       return 1;
-    }
-  else
-    {
+    else
       return 0;
-    }
+  }
+  return 0;
 }
 
-int is_valid_semicolon(char *input)
-{
-  int m;
-  int is_valid;
-  is_valid = 0;
-  for(m = 0; input[m] != '\0'; m++)
-    {
-      if(is_valid_character(input[m]) == 1)
-	{
-	  is_valid = 1;
-	}
+
+//Function helps check right side of special tokens for validity
+int check_right_valid(char* start, int redirect) {
+  int newlines = 0;
+  if(start != NULL && *start == '\n')
+    newlines++;
+  while(start != NULL) {
+    start++;
+    if(*start == ' ' || *start == '\t' || (!redirect && *start == '\n')) {
+      if(*start == '\n') {
+        newlines++;
+        continue;
+      }
     }
-  return is_valid;
+    else if(*start == '(' || is_valid_character(*start))
+      if(newlines ==0)
+        return 99;
+      else 
+        return newlines;
+    else
+      return 0;
+  }
+  return 0;
 }
 
-int is_correct_command(char *input)
-{
-  int j;
-  int correct_command;
-  int previous_character;
-  previous_character = 0;
-  correct_command = 1;
-  for(j = 0; input[j] != '\0'; j++)
-    {
-      if(input[j] == '<' || input[j] == '>')
-	{
-	  if((previous_character == '<' || previous_character == '>'))
-	    {
-	      return 0;
-	    }
-	  correct_command = 0;
-	  previous_character = input[j];
-	  continue;
-	}
-      if((is_valid_token(input[j]) == 1) || (is_valid_character(input[j]) == 1))
-	{
-	  correct_command = 1;
-	  previous_character = input[j];
-	  continue;
-	}
+//Function checks if newline 
+int complete_command(char* start, char* nline, int line) {
+  nline++;
+  if(*nline == NULL ) 
+    return 3;
+  nline--;
+  while(nline != start) {
+    nline--;
+    if(nline != NULL) {
+      if(*nline == ' ' || *nline == '\t')
+        continue;
+      else if(*nline == ';')  
+        return 2;
+      else if(is_valid_character(*nline)) {
+        nline++;
+        while(*(nline++) != '\0') {
+          char x = *nline;
+          if(x == '\n')
+            return 1;
+          else if( x == ' ' || x == '\t') 
+            continue;
+          else if(x == '(' || x == ')' || is_valid_character(x))
+            return 0;
+        }
+      }
+      else if(*nline == '<' || *nline == '>') {
+        fprintf(stderr, "%i: Syntax error new line after redirection", line);
+        exit(1);
+      }
+      else
+        return 0;  
     }
-  return correct_command;
+  }
+  return 0;
 }
   
-
 command_stream_t
 make_command_stream (int (*get_next_byte) (void *),
 		     void *get_next_byte_argument)
 {
+  char* whole_file;
   int next_byte;
-  int previous_byte;
-  int previous_character;
-  int line_number;
-  int start_comment;
-  int command_position;
-  int command_size;
-  int and_symbols;
-  int correct_command;
-  int complete_subshell;
-  int pipeline_count;
-  int last_newline;
-  previous_character = 0;
-  pipeline_count = 0;
-  complete_subshell = 1;
-  previous_byte = 0;
-  line_number = 1;
-  start_comment = 0;
-  command_position = 0;
-  command_size = 10;
-  and_symbols = 0;
-  correct_command = 0;
-  stream_t->full_commands = malloc(5 * sizeof(char*));
-  stream_t->full_command_size = 5;
+  int count = 0;
+  int line = 1;
+  int max_size = 50;
+  int complete_new = 0;
+  whole_file = malloc(max_size*sizeof(char));
+  stream_t->full_command_size = malloc(sizeof(int));
+  stream_t->full_command_position = malloc(sizeof(int));
+  stream_t->full_command_size = 10;
   stream_t->full_command_position = 0;
-  int i;
-  for(i = 0; i < 5; i++)
-  {
-    stream_t->full_commands[i] = malloc(10 * sizeof(char));
-  }
-
+  stream_t->full_commands = malloc(stream_t->full_command_size*sizeof(char*));
+  
   while((next_byte=get_next_byte(get_next_byte_argument)) >= 0)
     {
-      if(stream_t->full_command_position == (stream_t->full_command_size - 1))
-	{
-	  stream_t->full_command_size += 5;
-	  stream_t->full_commands = realloc(stream_t->full_commands, stream_t->full_command_size*sizeof(char*));
-	  int j;
-	  for(j = 0; j < 5; j++)
-	    {
-	      stream_t->full_commands[stream_t->full_command_position+j+1] = malloc(10 * sizeof(char));
-	    }
-	}
-      if(stream_t->full_commands[stream_t->full_command_position][command_position] == (command_size - 1))
-	{
-	  command_size += 10;
-	  stream_t->full_commands[stream_t->full_command_position] = realloc(stream_t->full_commands[stream_t->full_command_position], command_size * sizeof(char));
-	}
-	
-      if(next_byte == '#') //have to account for the end of comments
-	{
-	  if(previous_byte == ' ' || previous_byte == '\n' || previous_byte == '\t' || previous_byte == 0)
-	    {
-	      start_comment = 1;
-	      continue;
-	    }
-	  else
-	    {
-	      fprintf(stderr, "%d: Syntax Error\n", line_number);
-	       exit(0);
-	    }
-	} 
-
-        if((is_valid_token(next_byte) != 1) && (is_valid_character(next_byte) != 1) && (next_byte != ' ') && (next_byte != '\n') && (next_byte != '\t'))
-	{
-	  if(start_comment == 0)
-	    {
-	      fprintf(stderr, "%d: Syntax Error\n", line_number);
-	       exit(0);
-	    }
-	  else
-	    {
-	      continue;
-	    }
-	}
-	
-	if(((is_valid_character(next_byte)== 1) || (next_byte == ' ') || (next_byte == '\t')) && start_comment == 0)
-	  {
-	    stream_t->full_commands[stream_t->full_command_position][command_position] = next_byte;
-	    command_position++;
-	    if(is_valid_character(next_byte) == 1)
-	      {
-		last_newline = 0;
-		previous_character = next_byte;
-		previous_byte = next_byte;
-		continue;
-	      }
-	    else
-	      {
-		previous_byte = next_byte;
-	      }
-	  }
-	//satisfied up to this point
-	
-	if((is_valid_token(next_byte) == 1) && (start_comment == 0))
-	  {
-	    switch(next_byte)
-	      {
-	      case ';' :
-		if(is_valid_semicolon(stream_t->full_commands[stream_t->full_command_position]) == 1)
-		  {
-		    last_newline = 0;
-		    stream_t->full_commands[stream_t->full_command_position][command_position] = next_byte;
-		    command_position++;
-		    previous_character = next_byte;
-		    previous_byte = next_byte;
-		    continue;
-		  }
-		else
-		  {
-		    fprintf(stderr, "%d: Syntax Error\n", line_number);
-		    exit(0);
-		  }
-		break;
-	      case '|' : //at the end of full commands, check to make sure there are enough pipes
-		if((previous_character == '|') && (is_valid_character(previous_byte) != 1) && (previous_byte != '|'))
-		  {
-		    fprintf(stderr, "%d: Syntax Error\n", line_number);
-		    exit(0);
-		  }
-		if(last_newline == 1)
-		  {
-		    fprintf(stderr, "%d: Syntax Error\n", line_number);
-		    exit(0);
-		  }
-		if(previous_character == '|')
-		  {
-		    if(pipeline_count == 1)
-		      {
-			fprintf(stderr, "%d: Syntax Error\n", line_number);
-			exit(0);
-		      }
-		    pipeline_count++;
-		    last_newline = 0;
-		    stream_t->full_commands[stream_t->full_command_position][command_position] = next_byte;
-		    command_position ++;
-		    previous_character = next_byte;
-		    previous_byte = next_byte;
-		    continue;
-		  }
-		pipeline_count = 0;
-		last_newline = 0;
-		stream_t->full_commands[stream_t->full_command_position][command_position] = next_byte;
-		command_position ++;
-	        previous_character = next_byte;
-		previous_byte = next_byte;
-		continue;
-		break;
-	      case '&':
-		if((previous_character == '&') && (previous_byte != '&'))
-		  {
-		    fprintf(stderr, "%d: Syntax Error\n", line_number);
-		    exit(0);
-		  }
-	       	if(last_newline == 1)
-		  {
-		    fprintf(stderr, "%d: Syntax Error\n", line_number);
-		    exit(0);
-		  }
-		if(previous_byte == '&')
-		  {
-		    if(and_symbols == 1)
-		      {
-			fprintf(stderr, "%d: Syntax Error\n", line_number);
-			exit(0);
-		      }
-		    and_symbols++;
-		    last_newline = 0;
-		    stream_t->full_commands[stream_t->full_command_position][command_position] = next_byte;
-		    command_position ++;
-		    previous_character = next_byte;
-		    previous_byte = next_byte;
-		    continue;
-		  }
-		last_newline = 0;
-		stream_t->full_commands[stream_t->full_command_position][command_position] = next_byte;
-		command_position ++;
-	        previous_character = next_byte;
-		previous_byte = next_byte;
-		continue;
-		break;
-	      case ')':
-	      case '(': //check to see that there are enough parens
-		last_newline = 0;
-		stream_t->full_commands[stream_t->full_command_position][command_position] = next_byte;
-		command_position++;
-		previous_character = next_byte;
-		previous_byte = next_byte;
-		complete_subshell++;
-		continue;   
-		break;
-	      case '<':
-	      case'>':
-		last_newline = 0;
-		stream_t->full_commands[stream_t->full_command_position][command_position] = next_byte;
-		command_position++;
-		previous_character = next_byte;
-		previous_byte = next_byte;
-		continue;
-		break;
-	      }
-	  }
-
-	if(next_byte == '\n')
-	  {
-	    if(start_comment == 1)
-	      {
-		last_newline = 1;
-		line_number++;
-		start_comment = 0;
-		continue;
-	      }
-	    if(previous_character == '<' || previous_character == '>')
-	      {
-		fprintf(stderr,"%d: Syntax Error\n", line_number);
-		exit(0);
-	      }
-	    if(last_newline == 1)
-	      {
-		last_newline = 0;
-		correct_command = 1;
-		line_number++;
-		stream_t->full_command_position++;
-		command_position = 0;
-		continue;
-	      }
-	    last_newline = 1;
-	    continue;
-	  }
-	
-	if((correct_command == 1) && (is_correct_command(stream_t->full_commands[(stream_t->full_command_position)-1]) != 1))
-	  {
-	    fprintf(stderr, "%d: Syntax Error", line_number);
-	    exit(0);
-	  }
-    
+         if(count == max_size ) {
+           whole_file = realloc(whole_file, max_size*2);
+           max_size *=2;
+         }
+         whole_file[count] = next_byte;
+         count++;
     }
-	  
-  int j; 
-  char *ptr;
-  for(j=0; j <= stream_t->full_command_position; j++)
-    {
-      ptr = stream_t->full_commands[j];
-      int m;
-      for(m = 0; ptr[m] != '\0'; m++)
-	{
-	      printf("%c", ptr[m]);
-	   
-	}
-      printf("\n");
-    }
- 
+  if(count == max_size) {
+    whole_file = realloc(whole_file, max_size+1);
+  }
+  whole_file[count] = '\0';
+
+  int i = 0;
+  int second_token = 0;
+  char* start_ptr = whole_file;
+  int parentheses_open = 0;
+  int comment = 0;
+  for(; i<count; i++ ) {
+     second_token = 0;
+     if(whole_file[i] == ' ')
+       continue;
+     if(whole_file[i] == '\n'){
+       if(complete_new)
+         continue;
+       if(comment) {
+         line++;
+         comment = 0;
+         start_ptr = &whole_file[i];
+         while(*start_ptr == '\n') 
+           start_ptr++;
+         while(whole_file[i+1] == '\n')
+           i++;
+         continue;
+       }
+       int result = complete_command(start_ptr, whole_file+i, line);
+       if(result >0) {
+         if(parentheses_open) {
+           fprintf(stderr, "%i: Syntax error no matching parentheses", line);
+           exit(1);
+         }
+         line+=2;
+         int j = 0;
+         stream_t->full_commands[stream_t->full_command_position] = malloc(1+(&whole_file[i]-start_ptr)*sizeof(char));
+         while(start_ptr != &whole_file[i]) {
+           if(*start_ptr == '\n') {
+             start_ptr++;
+             continue;
+           }
+           stream_t->full_commands[stream_t->full_command_position][j] = *start_ptr;
+           j++;
+           start_ptr++;
+         }
+         stream_t->full_commands[stream_t->full_command_position][j] = '\0';
+         stream_t->full_command_position++;
+         complete_new = 1;
+         if(result == 1) {
+           while(*start_ptr == '\n') {
+             start_ptr++;
+           }
+           while(whole_file[i+1] == '\n') {
+             i++;
+           }
+           continue;
+         } else if(result == 2) {
+           while(*start_ptr == '\n') {
+             start_ptr++;
+           }
+           while(whole_file[i+1] == '\n') {
+             i++;
+           }
+           continue;
+         } else {
+           stream_t->full_command_position = 0;
+           return stream_t;
+         }
+       }
+     } 
+     if(comment)
+       continue;
+     else if(whole_file[i] == '#') {
+       comment = 1;
+       complete_new = 0;
+       continue;
+     }
+     else if(is_valid_character(whole_file[i]))  {
+       complete_new = 0;
+       continue;
+     }
+     else if(whole_file[i] == '<' || whole_file[i] == '>') {
+       if(!check_left_valid(start_ptr, (whole_file+i))) {
+         fprintf(stderr,"%i: Syntax Error for left side of %c", line, whole_file[i]);
+         exit(1);
+       }
+       int newlines = check_right_valid(whole_file+i, 1);
+       if(newlines == 0) {
+         fprintf(stderr, "%i: Syntax Error for right side of %c", line, whole_file[i]);
+         exit(1);
+       }
+     }
+     else if(whole_file[i] == '&' || whole_file[i] == '|') {
+       if(!check_left_valid(start_ptr, (whole_file+i))) {
+         fprintf(stderr,"%i: Syntax Error for left side of %c",line, whole_file[i]);
+         exit(1);
+       }
+       if((whole_file[i] == '&' || ((i+1 != count) && whole_file[i+1] == '|'))) {
+         second_token = 1;
+       }
+       int newlines = check_right_valid((whole_file+i+second_token), 0);
+       if(newlines == 0) {
+         fprintf(stderr,"%i: Syntax Error for right side of %c",line, whole_file[i]);
+         exit(1);
+       }
+       if(second_token)
+         i++;
+       if(newlines>0 && newlines != 99) 
+         i+=newlines;
+     }
+     else if(whole_file[i] == '(') {
+       parentheses_open ++;
+       continue;
+     }
+     else if(whole_file[i] == ')') {
+       parentheses_open --;
+       continue;
+     }
+     else {
+       fprintf(stderr, "%i: Syntax Error unidentified character", line);
+       exit(1);
+     }
+   }
+  stream_t->full_command_position = 0; 
   return stream_t;
 }
 
+
+/*command_stream_t
+make_command_stream (int (*get_next_byte) (void *),
+		     void *get_next_byte_argument)
+{
+   FIXME: Replace this with your implementation.  You may need to
+     add auxiliary functions and otherwise modify the source code.
+     You can also use external functions defined in the GNU C Library.  
+  command_stream_t stream_t = &stream;
+  stream_t = malloc(sizeof(command_stream_t));
+  stream_t->full_commands = malloc(8*sizeof(char*));
+  int i = 0;
+  for(; i<8; i++) {
+    stream_t->full_commands[i] = malloc(100*sizeof(char));
+  }
+  stream_t->full_commands[0] = "true";
+  stream_t->full_commands[1] = "g++ -c foo.c";
+  stream_t->full_commands[2] = ": : :";
+  stream_t->full_commands[3] = "cat < /etc/passwd | tr a-z A-Z | sort -u || echo sort failed!";
+  stream_t->full_commands[4] = "a b<c > d";
+  stream_t->full_commands[5] = "cat < /etc/passwd | tr a-z A-Z | sort -u > out || echo sort failed!";
+  stream_t->full_commands[6] = "a&&b||c &&d | e && f| g<h";
+  stream_t->full_commands[7] = "a<b>c|d<e>f|g<h>i";
+  stream_t->full_commands[8] = "mk dir ; cd dir; ls;";
+  stream_t->full_commands[9] = "(Hello | cat < /etc/passwd)";
+  stream_t->full_commands[10] = "a && b && (Hello || d) | cat";
+  stream_t->full_command_position = 0;
+  stream_t->full_command_size = 11;
+  stream_t = (command_stream_t) malloc(sizeof(command_stream_t));
+  stream_t->array_size = 1;
+  stream_t->command_position = 0;
+  stream_t->full_commands[0] = temp2;
+  int next_byte;
+  stream_t->command_array = malloc(20 * sizeof (command_t));
+  while((next_byte=get_next_byte(get_next_byte_argument)) >= 0)
+    {
+         printf("%c", next_byte);
+    }
+  return stream_t;
+}*/
 
 //This helper function removes beginning and trailing spaces, between 
 //the pointers given in the parameters.
@@ -363,7 +315,7 @@ read_part_command(char* start, char* end) {
   int size = end - start;
   return_ptr = (char*) malloc(size+2);
   strncpy(return_ptr, start, size+1);
-  return_ptr[size+2] = '\0';
+  return_ptr[size+1] = '\0';
   //printf("return_ptr %sE\n", return_ptr);
   return return_ptr;
 }
@@ -373,6 +325,8 @@ read_part_command(char* start, char* end) {
 //Therefore, search in reverse order and recursively parse the commands.
 command_t
 parse_command_stream (char* test) {
+  if(test == NULL)
+    return NULL;
   char* pipe = strchr(test, '|');
   char* start_ptr = test;
   char* pos_ptr = start_ptr;
@@ -489,7 +443,7 @@ command_t
 read_command_stream (command_stream_t s)
 {
   command_t cmd;
-  if( s->full_command_position < s->array_size) {
+  if( s->full_command_position < s->full_command_size) {
     cmd = parse_command_stream(s->full_commands[s->full_command_position]);
     s->full_command_position++;
   } else {
@@ -497,5 +451,9 @@ read_command_stream (command_stream_t s)
   }
   return cmd;
 }
+
+
+
+
 
 
