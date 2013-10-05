@@ -169,12 +169,23 @@ make_command_stream (int (*get_next_byte) (void *),
          }
          line+=2;
          int j = 0;
+         int prev_tab = 0;
          stream_t->full_commands[stream_t->full_command_position] = malloc(1+(&whole_file[i]-start_ptr)*sizeof(char));
          while(start_ptr != &whole_file[i]) {
            if(*start_ptr == '\n') {
              start_ptr++;
+             prev_tab = 0;
              continue;
-           }
+           } else
+           if(*start_ptr == '\t') {
+             if(prev_tab)
+               continue;
+             else {
+               *start_ptr = ' ';
+               prev_tab = 1;
+             }
+           } else
+             prev_tab = 0;
            stream_t->full_commands[stream_t->full_command_position][j] = *start_ptr;
            j++;
            start_ptr++;
@@ -252,6 +263,12 @@ make_command_stream (int (*get_next_byte) (void *),
        parentheses_open --;
        continue;
      }
+     else if(whole_file[i] == ';') {
+       if(!check_left_valid(start_ptr, (whole_file+i))) {
+         fprintf(stderr, "%i: Syntax Error left side of ;", line);
+         exit(1);
+       }
+     } 
      else {
        fprintf(stderr, "%i: Syntax Error unidentified character", line);
        exit(1);
@@ -260,47 +277,6 @@ make_command_stream (int (*get_next_byte) (void *),
   stream_t->full_command_position = 0; 
   return stream_t;
 }
-
-
-/*command_stream_t
-make_command_stream (int (*get_next_byte) (void *),
-		     void *get_next_byte_argument)
-{
-   FIXME: Replace this with your implementation.  You may need to
-     add auxiliary functions and otherwise modify the source code.
-     You can also use external functions defined in the GNU C Library.  
-  command_stream_t stream_t = &stream;
-  stream_t = malloc(sizeof(command_stream_t));
-  stream_t->full_commands = malloc(8*sizeof(char*));
-  int i = 0;
-  for(; i<8; i++) {
-    stream_t->full_commands[i] = malloc(100*sizeof(char));
-  }
-  stream_t->full_commands[0] = "true";
-  stream_t->full_commands[1] = "g++ -c foo.c";
-  stream_t->full_commands[2] = ": : :";
-  stream_t->full_commands[3] = "cat < /etc/passwd | tr a-z A-Z | sort -u || echo sort failed!";
-  stream_t->full_commands[4] = "a b<c > d";
-  stream_t->full_commands[5] = "cat < /etc/passwd | tr a-z A-Z | sort -u > out || echo sort failed!";
-  stream_t->full_commands[6] = "a&&b||c &&d | e && f| g<h";
-  stream_t->full_commands[7] = "a<b>c|d<e>f|g<h>i";
-  stream_t->full_commands[8] = "mk dir ; cd dir; ls;";
-  stream_t->full_commands[9] = "(Hello | cat < /etc/passwd)";
-  stream_t->full_commands[10] = "a && b && (Hello || d) | cat";
-  stream_t->full_command_position = 0;
-  stream_t->full_command_size = 11;
-  stream_t = (command_stream_t) malloc(sizeof(command_stream_t));
-  stream_t->array_size = 1;
-  stream_t->command_position = 0;
-  stream_t->full_commands[0] = temp2;
-  int next_byte;
-  stream_t->command_array = malloc(20 * sizeof (command_t));
-  while((next_byte=get_next_byte(get_next_byte_argument)) >= 0)
-    {
-         printf("%c", next_byte);
-    }
-  return stream_t;
-}*/
 
 //This helper function removes beginning and trailing spaces, between 
 //the pointers given in the parameters.
