@@ -18,14 +18,6 @@ struct command_stream
   int command_position;
 } stream;
 
-char* temp = "cat < /etc/passwd | tr a-z A-Z | sort -u || echo sort failed!";
-char* temp2 = "abc < def";
-char* temp3 = "tr a-z A-Z";
-/* FIXME: You may need to add #include directives, macro definitions,
-   static function definitions, etc.  */
-
-/* FIXME: Define the type 'struct command_stream' here.  This should
-   complete the incomplete type declaration in command.h.  */
 
 command_stream_t
 make_command_stream (int (*get_next_byte) (void *),
@@ -49,8 +41,11 @@ make_command_stream (int (*get_next_byte) (void *),
   stream_t->string_array[5] = "cat < /etc/passwd | tr a-z A-Z | sort -u > out || echo sort failed!";
   stream_t->string_array[6] = "a&&b||c &&d | e && f| g<h";
   stream_t->string_array[7] = "a<b>c|d<e>f|g<h>i";
+  stream_t->string_array[8] = "mk dir ; cd dir; ls;";
+  stream_t->string_array[9] = "(Hello | cat < /etc/passwd)";
+  stream_t->string_array[10] = "a && b && (Hello || d) | cat";
   stream_t->command_position = 0;
-  stream_t->array_size = 8;
+  stream_t->array_size = 11;
   /*stream_t = (command_stream_t) malloc(sizeof(command_stream_t));
   stream_t->array_size = 1;
   stream_t->command_position = 0;
@@ -63,7 +58,8 @@ make_command_stream (int (*get_next_byte) (void *),
     }*/
   return stream_t;
 }
-
+//This helper function removes beginning and trailing spaces, between 
+//the pointers given in the parameters.
 char*
 read_part_command(char* start, char* end) {
   char* return_ptr;
@@ -72,20 +68,17 @@ read_part_command(char* start, char* end) {
   end--;
   while(*end == ' ')
     end--;
-  int i = 0;
   int size = end - start;
   return_ptr = (char*) malloc(size+2);
-  /*while(start != end) {
-        return_ptr[i] = *start;
-        start++;
-        i++;
-  }*/
   strncpy(return_ptr, start, size+1);
   return_ptr[size+2] = '\0';
   //printf("return_ptr %sE\n", return_ptr);
   return return_ptr;
 }
 
+//Majority of work to find commands found here
+//Priority goes (), <>, |, &&||, ;, nothing.
+//Therefore, search in reverse order and recursively parse the commands.
 command_t
 parse_command_stream (char* test) {
   char* pipe = strchr(test, '|');
@@ -94,28 +87,63 @@ parse_command_stream (char* test) {
   char* end_ptr = test+strlen(test);
   char* left;
   char* right;
+  
   command_t cmd = ((command_t) malloc(sizeof(command_t)));
   cmd->u.word = (malloc(1*sizeof(char*)));
   *cmd->u.word = malloc(sizeof(start_ptr));
-  //printf("Test %s", test);
-  //Split left and right side commands to be put in union. command[]
-  int found = 0;
+  
+  //Start searching for the tokens
   char* and_token = strrchr(pos_ptr, '&');
   char* temp_or = strstr(pos_ptr, "||");
+
+  //OR token must not be mistaken for PIPE, so look for second |
   char* or_token = NULL;
   while(temp_or != NULL) {
     or_token = temp_or;
     temp_or = strstr(temp_or+2, "||");
   }
-  int or_found = 0;
-  int subtract = 0;
   char* in_token = strrchr(pos_ptr, '>');
   char* out_token = strrchr(pos_ptr, '<');
-  if(pipe == NULL && and_token == NULL && or_token == NULL && in_token == NULL && out_token == NULL && found == 0) {
+  char* semi_token = strrchr(pos_ptr, ';');
+  char* subshell_token = strrchr(pos_ptr, '(');
+  char* end_subshell_token = strrchr(pos_ptr, ')');
+  
+
+  if(subshell_token != NULL) {
+    if(and_token - subshell_token > 0 ) 
+      and_token = NULL;
+    if(or_token - subshell_token > 0)
+      or_token = NULL;
+    if(pipe - subshell_token > 0)
+      pipe = NULL;
+    if(in_token - subshell_token > 0)
+      in_token = NULL;
+    if(out_token - subshell_token >0)
+      out_token = NULL;
+    if(semi_token - subshell_token > 0)
+      semi_token = NULL;
+  }
+//If no tokens are found, this is a simple command.
+  if(pipe == NULL && and_token == NULL && or_token == NULL && in_token == NULL 
+                  && out_token == NULL && semi_token == NULL 
+                                       && subshell_token == NULL) {
     cmd->type = SIMPLE_COMMAND;
     strncpy(*cmd->u.word, start_ptr, strlen(start_ptr)); 
-  } else if(and_token != NULL || or_token != NULL) {
-    if(and_token == NULL || (and_token != NULL && or_token != NULL && ((and_token - or_token) < 0))) {
+  } else 
+
+//Search for sequence commands next.
+  if(semi_token != NULL) {
+    cmd->type = SEQUENCE_COMMAND;
+    left = read_part_command(start_ptr, semi_token);
+    right = read_part_command(semi_token+1, end_ptr);
+    cmd->u.command[0] = parse_command_stream(left);
+    cmd->u.command[1] = parse_command_stream(right);
+  } else 
+
+//Search for ANDS and ORS at the same time, then go from right-left order priority
+if(and_token != NULL || or_token != NULL) {
+    if(and_token == NULL || (and_token != NULL && or_token != NULL 
+                                       && ((and_token - or_token) < 0))) {
       left = read_part_command(start_ptr, or_token);
       right = read_part_command(or_token+2, end_ptr);
       cmd->type = OR_COMMAND;
@@ -126,16 +154,20 @@ parse_command_stream (char* test) {
     }
     cmd->u.command[0] = parse_command_stream(left);
     cmd->u.command[1] = parse_command_stream(right);
-    found = 1;
-  } else if(pipe != NULL && *(++pipe) != '|') {
-    pipe--;
+  } else 
+
+//Search for pipes
+if(pipe != NULL) {
     left = read_part_command(start_ptr, pipe);
     right = read_part_command(pipe+1, end_ptr);
     cmd->type = PIPE_COMMAND;
     cmd->status = -1;
     cmd->u.command[0] = parse_command_stream(left);
     cmd->u.command[1] = parse_command_stream(right);
-  } else if(in_token != NULL || out_token != NULL) {
+  } else 
+
+//I/O Redirection, look for both and right-left priority
+if(in_token != NULL || out_token != NULL) {
     cmd->type = SIMPLE_COMMAND;
     if(out_token - in_token > 0) {
       left = read_part_command(start_ptr, out_token);
@@ -149,8 +181,15 @@ parse_command_stream (char* test) {
       strncpy(cmd->output, right, strlen(right));
     }
     strncpy(*cmd->u.word, left, strlen(left));
-    found = 1;
-  }
+  } else 
+
+//Subshell commands are highest priority so they are found last so they are added to the top of the tree
+if(subshell_token != NULL) {
+  cmd->type = SUBSHELL_COMMAND;
+  left = read_part_command(++subshell_token, end_subshell_token);
+  cmd->u.subshell_command = malloc(sizeof(command_t));
+  cmd->u.subshell_command = parse_command_stream(left);
+}
   return cmd;
 }
 

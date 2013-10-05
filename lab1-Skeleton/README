@@ -1,4 +1,32 @@
 This is a skeleton for CS 111 Lab 1.
 
-Replace this README file with notes on your implementation.
-Mentions any special features or limitations.
+Sarah Wong
+604043984
+
+Surya M :D
+666666666
+
+STRUCT IMPLEMENTATION
+Our command_stream is made of 2 arrays: one is a char**, made to hold the string
+s of commands parsed from the file. The command structure has not been filled ou
+t yet, so it only holds strings to be parsed into the command structure. The oth
+er array, command_t*, will hold commands when they have been parsed by read_comm
+and_stream. The structure also holds some ints to keep track of the array size a
+nd the position to point to which string is next to be parsed into a command.
+
+MAKE_COMMAND_STREAM IMPLEMENTATION
+HI SURYA
+
+READ_COMMAND_STREAM IMPLEMENTATION
+  The function uses several helper functions to parse the char* into commands. p
+arse_command_stream(char*) does most of the work, and is called recursively to m
+ake the command tree. It searches in reverse order of priority, to construct the
+lower leaves of the tree first. So it looks for SIMPLE, SEQUENCE, AND/OR, PIPE, 
+IN/OUT, and finally SUBSHELL. 
+
+  If a token is found, first check that it is not part of a subshell command, an
+d then split the string into the left and right side of the command. The left is
+ inserted in u.command[0], and right is in the second box, while recursively cal
+ling the parse_command_stream function on left and right. A second helper functi
+on, read_part_command, simply creates substrings with start and end ptrs, also r
+emoving preceding and trailing whitespace. 
