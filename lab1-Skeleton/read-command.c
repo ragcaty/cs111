@@ -85,6 +85,9 @@ int complete_command(char* start, char* nline, int line) {
     if(nline != NULL) {
       if(*nline == ' ' || *nline == '\t')
         continue;
+      else if(*nline == ')') {
+        return 1;
+      }
       else if(*nline == ';')  
         return 2;
       else if(is_valid_character(*nline)) {
