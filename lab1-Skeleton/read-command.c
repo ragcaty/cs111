@@ -72,11 +72,13 @@ int check_right_valid(char* start, int redirect) {
   return 0;
 }
 
-//Function checks if newline 
+//Function checks if newline is actually a complete command
 int complete_command(char* start, char* nline, int line) {
   nline++;
+  //Check if EOF
   if(*nline == NULL ) 
     return 3;
+  //Check if previous character was a redirect
   nline--;
   while(nline != start) {
     nline--;
@@ -87,6 +89,7 @@ int complete_command(char* start, char* nline, int line) {
         return 2;
       else if(is_valid_character(*nline)) {
         nline++;
+//If valid char before new line, check after new line for another new line 
         while(*(nline++) != '\0') {
           char x = *nline;
           if(x == '\n')
@@ -138,6 +141,7 @@ make_command_stream (int (*get_next_byte) (void *),
     whole_file = realloc(whole_file, max_size+1);
   }
   whole_file[count] = '\0';
+//Read in whole file as a string and add null byte to end
 
   int i = 0;
   int second_token = 0;
@@ -145,9 +149,13 @@ make_command_stream (int (*get_next_byte) (void *),
   int parentheses_open = 0;
   int comment = 0;
   for(; i<count; i++ ) {
+//Going character by character, skip comments
      second_token = 0;
-     if(whole_file[i] == ' ')
+     if(whole_file[i] == ' ' || whole_file[i] == '\t')
        continue;
+//REach a new line, check to see if its part of a group of new lines (in a row)
+//if this is the end of a comment
+//or if this is the end of a full command
      if(whole_file[i] == '\n'){
        if(complete_new)
          continue;
@@ -162,6 +170,7 @@ make_command_stream (int (*get_next_byte) (void *),
          continue;
        }
        int result = complete_command(start_ptr, whole_file+i, line);
+//Based on result, if it returns > 0 that means it is a complete command
        if(result >0) {
          if(parentheses_open) {
            fprintf(stderr, "%i: Syntax error no matching parentheses", line);
@@ -169,23 +178,26 @@ make_command_stream (int (*get_next_byte) (void *),
          }
          line+=2;
          int j = 0;
-         int prev_tab = 0;
+         int prev_space = 0;
+//Create space in full_command array to hold new command
          stream_t->full_commands[stream_t->full_command_position] = malloc(1+(&whole_file[i]-start_ptr)*sizeof(char));
          while(start_ptr != &whole_file[i]) {
            if(*start_ptr == '\n') {
              start_ptr++;
-             prev_tab = 0;
+             prev_space = 0;
              continue;
            } else
-           if(*start_ptr == '\t') {
-             if(prev_tab)
+           if(*start_ptr == ' ') {
+             if(prev_space) {
+               start_ptr++;
                continue;
-             else {
-               *start_ptr = ' ';
-               prev_tab = 1;
              }
-           } else
-             prev_tab = 0;
+             else {
+               prev_space= 1;
+             }
+           } else {
+             prev_space = 0;
+           }
            stream_t->full_commands[stream_t->full_command_position][j] = *start_ptr;
            j++;
            start_ptr++;
@@ -193,15 +205,7 @@ make_command_stream (int (*get_next_byte) (void *),
          stream_t->full_commands[stream_t->full_command_position][j] = '\0';
          stream_t->full_command_position++;
          complete_new = 1;
-         if(result == 1) {
-           while(*start_ptr == '\n') {
-             start_ptr++;
-           }
-           while(whole_file[i+1] == '\n') {
-             i++;
-           }
-           continue;
-         } else if(result == 2) {
+         if(result != 3) {
            while(*start_ptr == '\n') {
              start_ptr++;
            }
@@ -214,18 +218,22 @@ make_command_stream (int (*get_next_byte) (void *),
            return stream_t;
          }
        }
-     } 
+     }
+//If you are in a comment, ignore characters 
      if(comment)
        continue;
+//If you hit a hash sign, this is a start of a comment
      else if(whole_file[i] == '#') {
        comment = 1;
        complete_new = 0;
        continue;
      }
+//If this is a character, continue
      else if(is_valid_character(whole_file[i]))  {
        complete_new = 0;
        continue;
      }
+//If this is redirect, check the left and right side for validity
      else if(whole_file[i] == '<' || whole_file[i] == '>') {
        if(!check_left_valid(start_ptr, (whole_file+i))) {
          fprintf(stderr,"%i: Syntax Error for left side of %c", line, whole_file[i]);
@@ -237,6 +245,7 @@ make_command_stream (int (*get_next_byte) (void *),
          exit(1);
        }
      }
+//If this is AND or OR check left and right as well
      else if(whole_file[i] == '&' || whole_file[i] == '|') {
        if(!check_left_valid(start_ptr, (whole_file+i))) {
          fprintf(stderr,"%i: Syntax Error for left side of %c",line, whole_file[i]);
@@ -255,14 +264,17 @@ make_command_stream (int (*get_next_byte) (void *),
        if(newlines>0 && newlines != 99) 
          i+=newlines;
      }
+//Signal that you are looking for the end of subshell
      else if(whole_file[i] == '(') {
        parentheses_open ++;
        continue;
      }
+//Signal that you have reached the end of a subshell
      else if(whole_file[i] == ')') {
        parentheses_open --;
        continue;
      }
+//Something must be on the left side of the semicolon
      else if(whole_file[i] == ';') {
        if(!check_left_valid(start_ptr, (whole_file+i))) {
          fprintf(stderr, "%i: Syntax Error left side of ;", line);
