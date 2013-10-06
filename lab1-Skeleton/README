@@ -3,8 +3,8 @@ This is a skeleton for CS 111 Lab 1.
 Sarah Wong
 604043984
 
-Surya M :D
-666666666
+Surya Mukkamalla 
+104008054
 
 STRUCT IMPLEMENTATION
 Our command_stream is made of 2 arrays: one is a char**, made to hold the string
@@ -15,7 +15,19 @@ and_stream. The structure also holds some ints to keep track of the array size a
 nd the position to point to which string is next to be parsed into a command.
 
 MAKE_COMMAND_STREAM IMPLEMENTATION
-HI SURYA
+  The function will read in the whole file as a char*, allocating more space
+as it goes. Then it will go char by char looking for ordinary/special tokens,
+spaces,tabs, or new lines. It will ignore spaces/tabs/characters, check the
+left and right side for &&/||/|/;/</>. When it reaches a newline character
+it uses a helper function to determine if this is truly the end of a command,
+or merely spacing trickery. If it is a full command, we allocate more space
+for the full_commands[][] in the command_stream to give to read_command_stream
+and then given a start_ptr and to the end of the newline, it shall read in the
+full command to save for the next function.
+  This function turns multiple whitespaces in a row to one white space.
+  It also gets rid of newlines in the middle of commands.
+  A semicolon/n is considered a full command.
+  A command like " a ; b" is considered the same command, of type SEQUENCE
 
 READ_COMMAND_STREAM IMPLEMENTATION
   The function uses several helper functions to parse the char* into commands. p
