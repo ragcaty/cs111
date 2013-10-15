@@ -23,6 +23,7 @@ g<e
 
 (a||b);(c&&d)
 
+a && (b || d) | c && e ; f < g > h
 EOF
 
 cat >test.exp <<'EOF'
@@ -60,6 +61,20 @@ cat >test.exp <<'EOF'
      &&
        d
     )
+# 7
+      a \
+    &&
+        (
+           b \
+         ||
+           d
+        ) \
+      |
+        c \
+    &&
+      e \
+  ;
+    f < g>h
 EOF
 
 ../timetrash -p test.sh >test.out 2>test.err || exit

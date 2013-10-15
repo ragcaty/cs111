@@ -318,7 +318,7 @@ command_t
 parse_command_stream (char* test) {
   if(test == NULL)
     return NULL;
-  char* pipe = strchr(test, '|');
+  char* pipe = strrchr(test, '|');
   char* start_ptr = test;
   char* pos_ptr = start_ptr;
   char* end_ptr = test+strlen(test);
@@ -347,17 +347,17 @@ parse_command_stream (char* test) {
   
 
   if(subshell_token != NULL) {
-    if(and_token - subshell_token > 0 ) 
+    if(and_token - subshell_token > 0 && (and_token - end_subshell_token < 0) ) 
       and_token = NULL;
-    if(or_token - subshell_token > 0)
+    if(or_token - subshell_token > 0 && (or_token - end_subshell_token < 0 ) )
       or_token = NULL;
-    if(pipe - subshell_token > 0)
+    if(pipe - subshell_token > 0 && (pipe - end_subshell_token < 0 ) )
       pipe = NULL;
-    if(in_token - subshell_token > 0)
+    if(in_token - subshell_token > 0 && (in_token - end_subshell_token < 0 ) )
       in_token = NULL;
-    if(out_token - subshell_token >0)
+    if(out_token - subshell_token > 0 && (out_token - end_subshell_token < 0 ) )
       out_token = NULL;
-    if(semi_token - subshell_token > 0)
+    if(semi_token - subshell_token > 0  && (semi_token - end_subshell_token < 0 ))
       semi_token = NULL;
   }
 //If no tokens are found, this is a simple command.
