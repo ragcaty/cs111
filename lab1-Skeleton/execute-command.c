@@ -62,6 +62,8 @@ parse(char* string)
 void
 fork_simple (char** args, char* c_output)
 {
+//If c_output is not null, redirect stdout to be stdin of that function
+//e.g sort < a > b. Redirect output of sort < a into b
   pid_t child_pid;
   int child_status;
   int defout = dup(1);
@@ -73,6 +75,7 @@ fork_simple (char** args, char* c_output)
       exit(1);
     }
   }
+//Everything that should go to stdout goes to filePtr
   dup2(filePtr, 1);
   child_pid = fork();
   if(child_pid < 0) {
@@ -84,6 +87,7 @@ fork_simple (char** args, char* c_output)
     fprintf(stderr, "Fail on execvp, simple command");
     exit(1); 
   }
+//Return stdout to normal
   dup2(defout, 1);
   close(filePtr);
   close(defout);
@@ -97,17 +101,6 @@ void
 execute_command (command_t c, bool time_travel)
 {
   /*  error (1, 0, "command execution not yet implemented");*/
-  //REDIRECT AND OR SUBSHELL
-  //So for redirect, check if files can open, use dup and exec to read in and 
-  //write.
-  //Psuedo:
-  //  If simple, check for redirect token (input/output)
-  //  if so, check left (word) for exec. 
-  //  If it is exec, use fork, dup, and pipe
-  //  and put into other file.
-  //  if its < vice versa
-  //  AND/OR, just do left and right
-  //  Subshell, do subshell cmd
   char** args;
   if(c->type == SIMPLE_COMMAND) {
     char** args = parse(*(c->u.word));
@@ -134,26 +127,12 @@ execute_command (command_t c, bool time_travel)
     if(c->output != NULL) {
       fork_simple(args, c->output);
     }
-/*      FILE* filePtr;
-      char* read_buf;
-      filePtr = fopen(c->input, "r");
-      if(filePtr == NULL) {
-        fprintf(stderr, "File reading error");
-        exit(1);
-      }
-      fseek(filePtr, 0, SEEK_END);
-      long lSize = ftell (filePtr);
-      rewind(filePtr);
-      read_buf = malloc(lSize*sizeof(char)+1);
-      int read_buf_result = fread(read_buf, 1, lSize, filePtr);
-      if(read_buf_result != lSize) {
-        fprintf(stderr, "Error reading from file in child");
-        exit(1);
-      }
-      fclose(filePtr);
-      read_buf[lSize] = '\0'; 
-      args[actual_size] = malloc(sizeof(read_buf));
-      memcpy(args[actual_size], read_buf, sizeof(read_buf));
-      execvp(args[0], args); */
-  } 
+  } else 
+  if(c->type == AND_COMMAND || c->type == OR_COMMAND) {
+    execute_command(c->u.command[0], time_travel);
+    execute_command(c->u.command[1], time_travel);
+  } else
+  if(c->type == SUBSHELL_COMMAND) {
+    execute_command(c->u.subshell_command, time_travel);
+  }
 }
