@@ -124,6 +124,43 @@ void pipe_command(command_t c)
     }
 }
 
+void sequence_command(command_t c)
+{
+  int status;
+  pid_t pid1;
+  pid_t pid2;
+  pid = fork();
+  if(pid1 < 0)
+    {
+      fprintf(stderr, "Fork failed.");
+      exit(1);
+    }
+  if(pid1 > 0)
+    {
+      waitpid(pid, &status, 0);
+    }
+  if(pid1 == 0)
+    {
+      pid2 = fork();
+      if(pid2 < 0)
+	{
+	  fprintf(stderr, "Fork failed.");
+	  exit(1);
+	}
+      if(pid2 > 0)
+	{
+	  waitpid(pid2, &status, 0);
+	  execute_no_time_travel(c->u.command[1]);
+	  _exit(c->u.command[1]->status);
+	}
+      if(pid2 == 0)
+	{
+	  execute_no_time_travel(c->u.command[0]);
+	  _exit(c->u.command[0]->status);
+	}
+    }
+}
+
 void simple_command(command_t c)
 {
   int status;
