@@ -406,7 +406,16 @@ if(pipe != NULL) {
 //I/O Redirection, look for both and right-left priority
 if(in_token != NULL || out_token != NULL) {
     cmd->type = SIMPLE_COMMAND;
-    if(out_token - in_token > 0) {
+    if(in_token != NULL && out_token != NULL) {
+      left = read_part_command(start_ptr, out_token);
+      right = read_part_command(out_token+1, in_token);
+      cmd->input = malloc(sizeof(right));
+      strncpy(cmd->input, right, strlen(right));
+      right = read_part_command(in_token+1, end_ptr);
+      cmd->output = malloc(sizeof(right));
+      strncpy(cmd->output, right, strlen(right));
+    } else
+    if(in_token == NULL) {
       left = read_part_command(start_ptr, out_token);
       right = read_part_command(out_token+1, end_ptr);
       cmd->input = malloc(sizeof(start_ptr));
