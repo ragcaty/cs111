@@ -181,7 +181,7 @@ void simple_command(command_t c)
       create_string(&input, c);
       execvp(input[0], input);
       fprintf(stderr, "Invalid command.");
-      exit(1);
+      _exit(1);
     }
 }
 
