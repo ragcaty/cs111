@@ -123,14 +123,17 @@ execute_command (command_t c, bool time_travel)
     } 
     //The left side TAKES IN data from the right side. right side must be
     //file? Can it be a string, or another command?
-    else if(c->input != NULL) {
+    if(c->input != NULL) {
       char* right_arg = malloc(sizeof(c->input)+1);
       memcpy(right_arg, c->input, sizeof(c->input));
       right_arg[strlen(c->input)] = '\0';
       args[actual_size] = malloc(sizeof(right_arg));
       memcpy(args[actual_size], right_arg, sizeof(right_arg));
            fork_simple(args, c->output);
-    } 
+    }
+    if(c->output != NULL) {
+      fork_simple(args, c->output);
+    }
 /*      FILE* filePtr;
       char* read_buf;
       filePtr = fopen(c->input, "r");
