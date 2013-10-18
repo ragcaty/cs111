@@ -4,6 +4,7 @@
 #include "command-internals.h"
 
 #include <error.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -60,18 +61,18 @@ parse(char* string)
 }
 
 void
-fork_simple (char** args, char* c_output)
+fork_simple (char** args, char* c_output, command_t c)
 {
 //If c_output is not null, redirect stdout to be stdin of that function
 //e.g sort < a > b. Redirect output of sort < a into b
   pid_t child_pid;
-  int child_status;
+  int pid_status;
   int defout = dup(1);
   FILE* filePtr = NULL;
   if(c_output != NULL) {
-    filePtr = open(c_output, O_RDWR);
+    filePtr = open(c_output, O_RDWR|O_CREAT, S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IWGRP|S_IXGRP);
     if(filePtr == NULL) {
-      fprintf(stderr, "File reading error");
+      fprintf(stderr, "File reading error\n");
       return;
     }
   }
@@ -79,20 +80,22 @@ fork_simple (char** args, char* c_output)
   dup2(filePtr, 1);
   child_pid = fork();
   if(child_pid < 0) {
-    fprintf(stderr, "failed to fork");
+    fprintf(stderr, "failed to fork\n");
     return;
   }
   if(child_pid == 0) {
-    execvp(args[0], args);
-    fprintf(stderr, "Fail on execvp, simple command");
-    return;
+      if(execvp(args[0], args)  == -1) {
+        fprintf(stderr, "Fail on execvp, simple command\n");
+        _exit(pid_status);
+      }
   }
 //Return stdout to normal
   dup2(defout, 1);
   close(filePtr);
   close(defout);
-  pid_t tpid = wait(&child_status);
-  printf("done with simple fork\n");
+  wait(&pid_status);
+  c->status = pid_status;
+  printf("Done\n");
 }
 
 void
@@ -110,7 +113,7 @@ subshell_execute_command (command_t c, bool time_travel, char* output)
     }
     //There is no redirection, this is a VERY SIMPLE command
     if(c->input == NULL && c->output == NULL) {
-      fork_simple(args, output);
+      fork_simple(args, output, c);
     } 
     //The left side TAKES IN data from the right side. right side must be
     //file? Can it be a string, or another command?
@@ -120,19 +123,21 @@ subshell_execute_command (command_t c, bool time_travel, char* output)
       right_arg[strlen(c->input)] = '\0';
       args[actual_size] = malloc(sizeof(right_arg));
       memcpy(args[actual_size], right_arg, sizeof(right_arg));
-           fork_simple(args, c->output);
+      fork_simple(args, c->output, c);
     }
     if(c->output != NULL) {
-      fork_simple(args, c->output);
+      fork_simple(args, c->output, c);
     }
   } else 
   if(c->type == AND_COMMAND) {
     subshell_execute_command(c->u.command[0], time_travel, output);
+    if(c->u.command[0]->status != 0)
+      return;
     subshell_execute_command(c->u.command[1], time_travel, output);
   } else if(c->type == OR_COMMAND) {
     subshell_execute_command(c->u.command[0], time_travel, output);
-    //ONLY IF FIRST ONE FAILS
-    subshell_execute_command(c->u.command[1], time_travel, output);
+    if(c->u.command[0]->status != 0)
+      subshell_execute_command(c->u.command[1], time_travel, output);
   } else
   if(c->type == SUBSHELL_COMMAND) {
     subshell_execute_command(c->u.subshell_command, time_travel, output);
@@ -153,7 +158,7 @@ execute_command (command_t c, bool time_travel)
     }
     //There is no redirection, this is a VERY SIMPLE command
     if(c->input == NULL && c->output == NULL) {
-      fork_simple(args, NULL);
+      fork_simple(args, NULL, c);
     } 
     //The left side TAKES IN data from the right side. right side must be
     //file? Can it be a string, or another command?
@@ -163,18 +168,21 @@ execute_command (command_t c, bool time_travel)
       right_arg[strlen(c->input)] = '\0';
       args[actual_size] = malloc(sizeof(right_arg));
       memcpy(args[actual_size], right_arg, sizeof(right_arg));
-           fork_simple(args, c->output);
+      fork_simple(args, c->output, c);
     }
     if(c->output != NULL) {
-      fork_simple(args, c->output);
+      fork_simple(args, c->output, c);
     }
   } else 
   if(c->type == AND_COMMAND) {
     execute_command(c->u.command[0], time_travel);
+    if(c->u.command[0]->status != 0)
+      return;
     execute_command(c->u.command[1], time_travel);
   } else if(c->type == OR_COMMAND) {
     execute_command(c->u.command[0], time_travel);
-    execute_command(c->u.command[1], time_travel);
+    if(c->u.command[0]->status != 0)
+      execute_command(c->u.command[1], time_travel);
   }
   if(c->type == SUBSHELL_COMMAND) {
     subshell_execute_command(c->u.subshell_command, time_travel, c->output);
