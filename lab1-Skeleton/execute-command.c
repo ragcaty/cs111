@@ -111,7 +111,7 @@ void pipe_command(command_t c, bool time_travel)
 	}
       execute_command(c->u.command[1], time_travel);
       _exit(c->u.command[1]->status);
-    }
+      }
 }
 
 void sequence_command(command_t c, bool time_travel)
@@ -234,63 +234,11 @@ parse(char* string)
   return args;
 }
 
-void
-fork_simple (char** args, char* c_output, command_t c)
-{
-//If c_output is not null, redirect stdout to be stdin of that function
-//e.g sort < a > b. Redirect output of sort < a into b
-  /* pid_t child_pid;
-  int pid_status;
-  //int defout = dup(1);
-  int filePtr = NULL;
-  if(c_output != NULL) {
-    filePtr = open(c_output, O_RDWR|O_CREAT, S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IWGRP|S_IXGRP);
-    if(filePtr < 0) {
-      fprintf(stderr, "File reading error\n");
-      return;
-    }
-//Everything that should go to stdout goes to filePtr
-  dup2(filePtr, 1);
-  child_pid = fork();
-  if(child_pid < 0) {
-    fprintf(stderr, "failed to fork\n");
-    return;
-  }
-  if(child_pid == 0) {
-      if(execvp(args[0], args)  == -1) {
-        fprintf(stderr, "Fail on execvp, simple command\n");
-        _exit(pid_status);
-      }
-  }
-//Return stdout to normal
-//  dup2(defout, 1);
-  close(filePtr);
-  //close(defout);
-  wait(&pid_status);
-  c->status = pid_status;
-  printf("Done\n");
-  }*/
-  int fd_out = open(c_output, O_CREAT | O_WRONLY | O_TRUNC | S_IRUSR | S_IRGRP | S_IWGRP | S_IWUSR);
-  if( fd_out < 0)
-    {
-      fprintf(stderr, "ERROR");
-    }
-  if(dup2(fd_out, 1) < 0)
-    {
-      fprintf(stderr, "Error");
-    }
-  if(close(fd_out) < 0)
-    {
-      fprintf(stderr, "Error");
-    }
-  simple_command(c, args);
-}
 
 void
 subshell_execute_command (command_t c, bool time_travel, char* output)
 {
   /*  error (1, 0, "command execution not yet implemented");*/
-  char** args;
   if(c->type == SIMPLE_COMMAND) {
     char** args = parse(*(c->u.word));
     int actual_size = 0;
@@ -357,7 +305,6 @@ void
 execute_command (command_t c, bool time_travel)
 {
   /*  error (1, 0, "command execution not yet implemented");*/
-  char** args;
   if(c->type == SIMPLE_COMMAND) {
     char** args = parse(*(c->u.word));
     int actual_size = 0;

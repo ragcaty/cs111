@@ -1,1 +1,0 @@
-(cat d && cat a) || cat b
