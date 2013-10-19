@@ -141,9 +141,10 @@ make_command_stream (int (*get_next_byte) (void *),
          count++;
     }
   if(count == max_size) {
-    whole_file = realloc(whole_file, max_size+1);
+    whole_file = realloc(whole_file, max_size+2);
   }
-  whole_file[count] = '\0';
+  whole_file[count] = '\n';
+  whole_file[count+1] = '\0';
 //Read in whole file as a string and add null byte to end
 
   int i = 0;
