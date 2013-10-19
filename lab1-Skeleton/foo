@@ -1,1 +1,2 @@
-ls -l
+sort < a | cat b - 
+

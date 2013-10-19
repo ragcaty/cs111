@@ -67,7 +67,31 @@ void pipe_command(command_t c, bool time_travel)
       fprintf(stderr, "Could not create a pipe.");
       exit(1);
     }
-  pid_1 = fork();
+  pid1 = fork();
+  if(pid1 < 0)
+    {
+      fprintf(stderr, "Fork failed.");
+      exit(1);
+    }
+  if(pid1 > 0)
+    {
+      close(fd[0]);
+      close(fd[1]);
+      waitpid(pid1, &status, 0);
+    }
+  if(pid1 == 0)
+    {
+      pid2 = fork();
+      if(pid2 < 0)
+	{
+	  fprintf(stderr, "Fork failed.");
+	  exit(1);
+	}
+      if(pid2 > 0)
+	{
+	  waitpid(pid2, &status, 0);
+	  execute_command
+  /*pid1 = fork();
   if(pid1 < 0)
     {
       fprintf(stderr, "Fork failed.");
@@ -107,7 +131,7 @@ void pipe_command(command_t c, bool time_travel)
 	      fprintf(stderr, "Could not perform dup2.");
 	      exit(1);
 	    }
-	  execute_no_time_travel(c->u.command[0]);
+	  execute_command(c->u.command[0], time_travel);
 	  _exit(c->u.command[0]->status);
 	}
     }
@@ -119,9 +143,9 @@ void pipe_command(command_t c, bool time_travel)
 	  fprintf(stderr, "Could not perform dup2.");
 	  exit(1);
 	}
-      execute_no_time_travel(c->u.command[1]);
+      execute_command(c->u.command[1], time_travel);
       _exit(c->u.command[1]->status);
-    }
+      }*/
 }
 
 void sequence_command(command_t c, bool time_travel)
@@ -129,7 +153,7 @@ void sequence_command(command_t c, bool time_travel)
   int status;
   pid_t pid1;
   pid_t pid2;
-  pid = fork();
+  pid1 = fork();
   if(pid1 < 0)
     {
       fprintf(stderr, "Fork failed.");
@@ -137,7 +161,7 @@ void sequence_command(command_t c, bool time_travel)
     }
   if(pid1 > 0)
     {
-      waitpid(pid, &status, 0);
+      waitpid(pid1, &status, 0);
     }
   if(pid1 == 0)
     {
@@ -150,12 +174,12 @@ void sequence_command(command_t c, bool time_travel)
       if(pid2 > 0)
 	{
 	  waitpid(pid2, &status, 0);
-	  execute_no_time_travel(c->u.command[1]);
+	  execute_command(c->u.command[1], time_travel);
 	  _exit(c->u.command[1]->status);
 	}
       if(pid2 == 0)
 	{
-	  execute_no_time_travel(c->u.command[0]);
+	  execute_command(c->u.command[0], time_travel);
 	  _exit(c->u.command[0]->status);
 	}
     }
@@ -230,11 +254,11 @@ fork_simple (char** args, char* c_output, command_t c)
 //e.g sort < a > b. Redirect output of sort < a into b
   pid_t child_pid;
   int pid_status;
-  int defout = dup(1);
-  FILE* filePtr = NULL;
+  //int defout = dup(1);
+  int filePtr = NULL;
   if(c_output != NULL) {
     filePtr = open(c_output, O_RDWR|O_CREAT, S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IWGRP|S_IXGRP);
-    if(filePtr == NULL) {
+    if(filePtr < 0) {
       fprintf(stderr, "File reading error\n");
       return;
     }
@@ -253,19 +277,17 @@ fork_simple (char** args, char* c_output, command_t c)
       }
   }
 //Return stdout to normal
-  dup2(defout, 1);
+  //dup2(defout, 1);
   close(filePtr);
-  close(defout);
+  //close(defout);
   wait(&pid_status);
   c->status = pid_status;
-  printf("Done\n");
 }
 
 void
 subshell_execute_command (command_t c, bool time_travel, char* output)
 {
   /*  error (1, 0, "command execution not yet implemented");*/
-  char** args;
   if(c->type == SIMPLE_COMMAND) {
     char** args = parse(*(c->u.word));
     int actual_size = 0;
@@ -317,7 +339,6 @@ void
 execute_command (command_t c, bool time_travel)
 {
   /*  error (1, 0, "command execution not yet implemented");*/
-  char** args;
   if(c->type == SIMPLE_COMMAND) {
     char** args = parse(*(c->u.word));
     int actual_size = 0;
