@@ -288,8 +288,10 @@ execute_command (command_t c, bool time_travel)
   if(c->type == AND_COMMAND) {
     execute_command(c->u.command[0], time_travel);
     if(c->u.command[0]->status != 0)
-      c->status = c->u.command[0]->status;
-      return;
+      {
+	c->status = c->u.command[0]->status;
+	return;
+      }
     execute_command(c->u.command[1], time_travel);
     c->status = c->u.command[1]->status;
   } else if(c->type == OR_COMMAND) {
