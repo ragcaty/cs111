@@ -281,14 +281,20 @@ subshell_execute_command (command_t c, bool time_travel, char* output)
     }*/
   } else 
   if(c->type == AND_COMMAND) {
-    subshell_execute_command(c->u.command[0], time_travel, output);
-    if(c->u.command[0]->status != 0)
+    execute_command(c->u.command[0], time_travel);
+    if(c->u.command[0]->status != 0){
+      c->status = c->u.command[0]->status;
       return;
-    subshell_execute_command(c->u.command[1], time_travel, output);
+    }
+    execute_command(c->u.command[1], time_travel);
+    c->status = c->u.command[1]->status;
   } else if(c->type == OR_COMMAND) {
     subshell_execute_command(c->u.command[0], time_travel, output);
-    if(c->u.command[0]->status != 0)
+    if(c->u.command[0]->status != 0){
       subshell_execute_command(c->u.command[1], time_travel, output);
+      c->status = c->u.command[1]->status;
+    }
+    c->status = c->u.command[0]->status;
   } else
   if(c->type == PIPE_COMMAND) {
     pipe_command(c, time_travel);
@@ -336,12 +342,17 @@ execute_command (command_t c, bool time_travel)
   if(c->type == AND_COMMAND) {
     execute_command(c->u.command[0], time_travel);
     if(c->u.command[0]->status != 0)
+      c->status = c->u.command[0]->status;
       return;
     execute_command(c->u.command[1], time_travel);
+    c->status = c->u.command[1]->status;
   } else if(c->type == OR_COMMAND) {
     execute_command(c->u.command[0], time_travel);
-    if(c->u.command[0]->status != 0)
+    if(c->u.command[0]->status != 0) {
       execute_command(c->u.command[1], time_travel);
+      c->status = c->u.command[1]->status;
+    }
+    c->status = c->u.command[0]->status;
   }else
   if(c->type == PIPE_COMMAND) {
     pipe_command(c, time_travel);
@@ -351,5 +362,6 @@ execute_command (command_t c, bool time_travel)
   } else 
   if(c->type == SUBSHELL_COMMAND) {
     subshell_execute_command(c->u.subshell_command, time_travel, c->output);
+    c->status = c->u.subshell_command->status;
   }
 }
