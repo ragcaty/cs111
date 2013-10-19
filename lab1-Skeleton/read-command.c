@@ -404,9 +404,18 @@ if(pipe != NULL) {
   } else 
 
 //I/O Redirection, look for both and right-left priority
-if(in_token != NULL || out_token != NULL) {
+if((in_token != NULL || out_token != NULL) && subshell_token == NULL) {
     cmd->type = SIMPLE_COMMAND;
-    if(out_token - in_token > 0) {
+    if(in_token != NULL && out_token != NULL) {
+      left = read_part_command(start_ptr, out_token);
+      right = read_part_command(out_token+1, in_token);
+      cmd->input = malloc(sizeof(right));
+      strncpy(cmd->input, right, strlen(right));
+      right = read_part_command(in_token+1, end_ptr);
+      cmd->output = malloc(sizeof(right));
+      strncpy(cmd->output, right, strlen(right));
+    } else
+    if(in_token == NULL) {
       left = read_part_command(start_ptr, out_token);
       right = read_part_command(out_token+1, end_ptr);
       cmd->input = malloc(sizeof(start_ptr));
@@ -423,11 +432,26 @@ if(in_token != NULL || out_token != NULL) {
 //Subshell commands are highest priority so they are found last so they are added to the top of the tree
 if(subshell_token != NULL) {
   cmd->type = SUBSHELL_COMMAND;
+     //>
+  if(in_token != NULL && out_token != NULL) {
+    left = read_part_command(start_ptr, out_token);
+    right = read_part_command(out_token+1, subshell_token);
+    cmd->input = malloc(sizeof(right));
+    strncpy(cmd->input, right, strlen(right));
+    right = read_part_command(in_token+1, end_ptr);
+    cmd->output = malloc(sizeof(right));
+    strncpy(cmd->output, right, strlen(right));
+  } 
+  if(in_token != NULL) {
+    right = read_part_command(in_token+1, end_ptr);
+    cmd->output = malloc(sizeof(start_ptr));
+    strncpy(cmd->output, right, strlen(right));
+  }
   left = read_part_command(++subshell_token, end_subshell_token);
   cmd->u.subshell_command = malloc(sizeof(command_t));
   cmd->u.subshell_command = parse_command_stream(left);
 }
-  return cmd;
+  return cmd; 
 }
 
 command_t

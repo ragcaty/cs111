@@ -74,7 +74,7 @@ cat >test.exp <<'EOF'
     &&
       e \
   ;
-    f < g>h
+    f<g>h
 EOF
 
 ../timetrash -p test.sh >test.out 2>test.err || exit

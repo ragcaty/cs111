@@ -4,14 +4,14 @@
 #include "command-internals.h"
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <error.h>
 #include <string.h>
-
-/* FIXME: You may need to add #include directives, macro definitions,
-   static function definitions, etc.  */
+#include <errno.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 
 int
 command_status (command_t c)
@@ -19,7 +19,7 @@ command_status (command_t c)
   return c->status;
 }
 
-void execute_no_time_travel(command_t c)
+/*void execute_no_time_travel(command_t c)
 {
   switch(c->type)
     {
@@ -54,8 +54,8 @@ void execute_command(command_t c, bool time_travel)
     {
       exit(0);
       }
-}
-void pipe_command(command_t c)
+}*/
+void pipe_command(command_t c, bool time_travel)
 {
   int status;
   int fd[2];
@@ -124,7 +124,7 @@ void pipe_command(command_t c)
     }
 }
 
-void sequence_command(command_t c)
+void sequence_command(command_t c, bool time_travel)
 {
   int status;
   pid_t pid1;
@@ -160,7 +160,7 @@ void sequence_command(command_t c)
 	}
     }
 }
-
+/*
 void simple_command(command_t c)
 {
   int status;
@@ -178,13 +178,189 @@ void simple_command(command_t c)
     }
   if(pid == 0)
     {
-      create_string(&input, c);
+      input = parse(*c->u.word);
       execvp(input[0], input);
       fprintf(stderr, "Invalid command.");
       _exit(1);
     }
 }
+*/
+//Helps to parse string into args[] for execvp
+//Parses on spaces and null token
+//Returns char** args
 
-void create_string(char **input, command_t c)
+char** 
+parse(char* string)
 {
+  if(strlen(string) == 1) {}
+    //do something for one character?
+  char* start = string;
+  char* end = string;
+  char* nullend = &string[strlen(string)];
+  char** args = (char**) malloc(5*sizeof(char*));
+  int size_args = 5;
+  int i = 0;
+  while(end != nullend) {
+    while(*end != ' ' &&  end != nullend) {
+      end++;
+    }
+    int length = 1+(end - start);
+    args[i] = malloc(length*sizeof(char));
+    memcpy(args[i], start, length);
+    args[i][length-1] = '\0';
+    if(end == nullend)
+      break;
+    end++;
+    start = end;
+    i++;
+    if(i == size_args) {
+      size_args *= 2;
+      args = realloc(args, size_args*sizeof(char*)); 
+    }
+  }
+  if(i == size_args-1)
+    args = realloc(args, (size_args+1)*sizeof(char*));
+  return args;
+}
+
+void
+fork_simple (char** args, char* c_output, command_t c)
+{
+//If c_output is not null, redirect stdout to be stdin of that function
+//e.g sort < a > b. Redirect output of sort < a into b
+  pid_t child_pid;
+  int pid_status;
+  int defout = dup(1);
+  FILE* filePtr = NULL;
+  if(c_output != NULL) {
+    filePtr = open(c_output, O_RDWR|O_CREAT, S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IWGRP|S_IXGRP);
+    if(filePtr == NULL) {
+      fprintf(stderr, "File reading error\n");
+      return;
+    }
+  }
+//Everything that should go to stdout goes to filePtr
+  dup2(filePtr, 1);
+  child_pid = fork();
+  if(child_pid < 0) {
+    fprintf(stderr, "failed to fork\n");
+    return;
+  }
+  if(child_pid == 0) {
+      if(execvp(args[0], args)  == -1) {
+        fprintf(stderr, "Fail on execvp, simple command\n");
+        _exit(pid_status);
+      }
+  }
+//Return stdout to normal
+  dup2(defout, 1);
+  close(filePtr);
+  close(defout);
+  wait(&pid_status);
+  c->status = pid_status;
+  printf("Done\n");
+}
+
+void
+subshell_execute_command (command_t c, bool time_travel, char* output)
+{
+  /*  error (1, 0, "command execution not yet implemented");*/
+  char** args;
+  if(c->type == SIMPLE_COMMAND) {
+    char** args = parse(*(c->u.word));
+    int actual_size = 0;
+    char** ptr = args;
+    while(*ptr != NULL) {
+      actual_size++;
+      ptr++;
+    }
+    //There is no redirection, this is a VERY SIMPLE command
+    if(c->input == NULL && c->output == NULL) {
+      fork_simple(args, output, c);
+    } 
+    //The left side TAKES IN data from the right side. right side must be
+    //file? Can it be a string, or another command?
+    if(c->input != NULL) {
+      char* right_arg = malloc(sizeof(c->input)+1);
+      memcpy(right_arg, c->input, sizeof(c->input));
+      right_arg[strlen(c->input)] = '\0';
+      args[actual_size] = malloc(sizeof(right_arg));
+      memcpy(args[actual_size], right_arg, sizeof(right_arg));
+      fork_simple(args, c->output, c);
+    }
+    if(c->output != NULL) {
+      fork_simple(args, c->output, c);
+    }
+  } else 
+  if(c->type == AND_COMMAND) {
+    subshell_execute_command(c->u.command[0], time_travel, output);
+    if(c->u.command[0]->status != 0)
+      return;
+    subshell_execute_command(c->u.command[1], time_travel, output);
+  } else if(c->type == OR_COMMAND) {
+    subshell_execute_command(c->u.command[0], time_travel, output);
+    if(c->u.command[0]->status != 0)
+      subshell_execute_command(c->u.command[1], time_travel, output);
+  } else
+  if(c->type == PIPE_COMMAND) {
+    pipe_command(c, time_travel);
+  } else 
+  if(c->type == SEQUENCE_COMMAND) {
+    sequence_command(c, time_travel);
+  } else
+  if(c->type == SUBSHELL_COMMAND) {
+    subshell_execute_command(c->u.subshell_command, time_travel, output);
+  }
+}
+
+void
+execute_command (command_t c, bool time_travel)
+{
+  /*  error (1, 0, "command execution not yet implemented");*/
+  char** args;
+  if(c->type == SIMPLE_COMMAND) {
+    char** args = parse(*(c->u.word));
+    int actual_size = 0;
+    char** ptr = args;
+    while(*ptr != NULL) {
+      actual_size++;
+      ptr++;
+    }
+    //There is no redirection, this is a VERY SIMPLE command
+    if(c->input == NULL && c->output == NULL) {
+      fork_simple(args, NULL, c);
+    } 
+    //The left side TAKES IN data from the right side. right side must be
+    //file? Can it be a string, or another command?
+    if(c->input != NULL) {
+      char* right_arg = malloc(sizeof(c->input)+1);
+      memcpy(right_arg, c->input, sizeof(c->input));
+      right_arg[strlen(c->input)] = '\0';
+      args[actual_size] = malloc(sizeof(right_arg));
+      memcpy(args[actual_size], right_arg, sizeof(right_arg));
+      fork_simple(args, c->output, c);
+    }
+    if(c->output != NULL) {
+      fork_simple(args, c->output, c);
+    }
+  } else 
+  if(c->type == AND_COMMAND) {
+    execute_command(c->u.command[0], time_travel);
+    if(c->u.command[0]->status != 0)
+      return;
+    execute_command(c->u.command[1], time_travel);
+  } else if(c->type == OR_COMMAND) {
+    execute_command(c->u.command[0], time_travel);
+    if(c->u.command[0]->status != 0)
+      execute_command(c->u.command[1], time_travel);
+  }else
+  if(c->type == PIPE_COMMAND) {
+    pipe_command(c, time_travel);
+  } else 
+  if(c->type == SEQUENCE_COMMAND) {
+    sequence_command(c, time_travel);
+  } else 
+  if(c->type == SUBSHELL_COMMAND) {
+    subshell_execute_command(c->u.subshell_command, time_travel, c->output);
+  }
 }
