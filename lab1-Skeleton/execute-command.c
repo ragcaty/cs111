@@ -43,18 +43,8 @@ command_status (command_t c)
       exit(1);
     }
 }
+*/
 
-void execute_command(command_t c, bool time_travel)
-{
-  if(time_travel == 0)
-    {
-      execute_no_time_travel(c);
-    }
-  else
-    {
-      exit(0);
-      }
-}*/
 void pipe_command(command_t c, bool time_travel)
 {
   int status;
@@ -67,7 +57,7 @@ void pipe_command(command_t c, bool time_travel)
       fprintf(stderr, "Could not create a pipe.");
       exit(1);
     }
-  pid_1 = fork();
+  pid1 = fork();
   if(pid1 < 0)
     {
       fprintf(stderr, "Fork failed.");
@@ -107,7 +97,7 @@ void pipe_command(command_t c, bool time_travel)
 	      fprintf(stderr, "Could not perform dup2.");
 	      exit(1);
 	    }
-	  execute_no_time_travel(c->u.command[0]);
+	  execute_command(c->u.command[0], time_travel);
 	  _exit(c->u.command[0]->status);
 	}
     }
@@ -119,7 +109,7 @@ void pipe_command(command_t c, bool time_travel)
 	  fprintf(stderr, "Could not perform dup2.");
 	  exit(1);
 	}
-      execute_no_time_travel(c->u.command[1]);
+      execute_command(c->u.command[1], time_travel);
       _exit(c->u.command[1]->status);
     }
 }
@@ -129,7 +119,7 @@ void sequence_command(command_t c, bool time_travel)
   int status;
   pid_t pid1;
   pid_t pid2;
-  pid = fork();
+  pid1 = fork();
   if(pid1 < 0)
     {
       fprintf(stderr, "Fork failed.");
@@ -137,7 +127,7 @@ void sequence_command(command_t c, bool time_travel)
     }
   if(pid1 > 0)
     {
-      waitpid(pid, &status, 0);
+      waitpid(pid1, &status, 0);
     }
   if(pid1 == 0)
     {
@@ -150,21 +140,20 @@ void sequence_command(command_t c, bool time_travel)
       if(pid2 > 0)
 	{
 	  waitpid(pid2, &status, 0);
-	  execute_no_time_travel(c->u.command[1]);
+	  execute_command(c->u.command[1], time_travel);
 	  _exit(c->u.command[1]->status);
 	}
       if(pid2 == 0)
 	{
-	  execute_no_time_travel(c->u.command[0]);
+	  execute_command(c->u.command[0], time_travel);
 	  _exit(c->u.command[0]->status);
 	}
     }
 }
-/*
-void simple_command(command_t c)
+
+void simple_command(command_t c, char **input)
 {
   int status;
-  char **input;
   pid_t pid = fork();
   if(pid < 0)
     {
@@ -173,18 +162,40 @@ void simple_command(command_t c)
     }
   if(pid > 0)
     {
-      waitpid(pid, &status, 0); //might have to check for errors in child process
+      waitpid(pid, &status, 0); 
       c->status = status;
     }
   if(pid == 0)
     {
-      input = parse(*c->u.word);
+      if(c->input != NULL)
+	{
+	  int file_ptr1 = open(c->input, O_RDWR);
+	  if(file_ptr1 < 0)
+	    {
+	      fprintf(stderr, "Error opening file.");
+	      return;
+	    }
+	  dup2(file_ptr1, 0); //check for errors here
+	  close(file_ptr1);
+	}
+      if(c->output != NULL)
+	{
+	  int file_ptr2 = open(c->output, O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IRGRP | S_IWGRP | S_IWUSR);
+	  if(file_ptr2 < 0)
+	    {
+	      fprintf(stderr, "Error writing to file.");
+	      return;
+	    }
+	  dup2(file_ptr2, 1); //check for errors here
+	  close(file_ptr2);
+	}
       execvp(input[0], input);
       fprintf(stderr, "Invalid command.");
       _exit(1);
     }
 }
-*/
+
+
 //Helps to parse string into args[] for execvp
 //Parses on spaces and null token
 //Returns char** args
@@ -228,17 +239,16 @@ fork_simple (char** args, char* c_output, command_t c)
 {
 //If c_output is not null, redirect stdout to be stdin of that function
 //e.g sort < a > b. Redirect output of sort < a into b
-  pid_t child_pid;
+  /* pid_t child_pid;
   int pid_status;
-  int defout = dup(1);
-  FILE* filePtr = NULL;
+  //int defout = dup(1);
+  int filePtr = NULL;
   if(c_output != NULL) {
     filePtr = open(c_output, O_RDWR|O_CREAT, S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IWGRP|S_IXGRP);
-    if(filePtr == NULL) {
+    if(filePtr < 0) {
       fprintf(stderr, "File reading error\n");
       return;
     }
-  }
 //Everything that should go to stdout goes to filePtr
   dup2(filePtr, 1);
   child_pid = fork();
@@ -253,12 +263,27 @@ fork_simple (char** args, char* c_output, command_t c)
       }
   }
 //Return stdout to normal
-  dup2(defout, 1);
+//  dup2(defout, 1);
   close(filePtr);
-  close(defout);
+  //close(defout);
   wait(&pid_status);
   c->status = pid_status;
   printf("Done\n");
+  }*/
+  int fd_out = open(c_output, O_CREAT | O_WRONLY | O_TRUNC | S_IRUSR | S_IRGRP | S_IWGRP | S_IWUSR);
+  if( fd_out < 0)
+    {
+      fprintf(stderr, "ERROR");
+    }
+  if(dup2(fd_out, 1) < 0)
+    {
+      fprintf(stderr, "Error");
+    }
+  if(close(fd_out) < 0)
+    {
+      fprintf(stderr, "Error");
+    }
+  simple_command(c, args);
 }
 
 void
@@ -274,13 +299,28 @@ subshell_execute_command (command_t c, bool time_travel, char* output)
       actual_size++;
       ptr++;
     }
+    simple_command(c, args);
     //There is no redirection, this is a VERY SIMPLE command
-    if(c->input == NULL && c->output == NULL) {
-      fork_simple(args, output, c);
+    /* if(c->input == NULL && c->output == NULL) {
+      simple_command(c, args);
     } 
     //The left side TAKES IN data from the right side. right side must be
     //file? Can it be a string, or another command?
     if(c->input != NULL) {
+      int fd_in = open(c->input, O_RDWR);
+      if(fd_in < 0)
+	{
+	  fprintf(stderr, "Error");
+	}
+      if(dup2(fd_in, 0) < 0)
+	{
+	  fprintf(stderr, "Error");
+	}
+      if(close(fd_in) < 0)
+	{
+	  fprintf(stderr, "Error");
+	}
+      simple_command(c, args);
       char* right_arg = malloc(sizeof(c->input)+1);
       memcpy(right_arg, c->input, sizeof(c->input));
       right_arg[strlen(c->input)] = '\0';
@@ -289,8 +329,8 @@ subshell_execute_command (command_t c, bool time_travel, char* output)
       fork_simple(args, c->output, c);
     }
     if(c->output != NULL) {
-      fork_simple(args, c->output, c);
-    }
+       fork_simple(args, c->output, c);
+    }*/
   } else 
   if(c->type == AND_COMMAND) {
     subshell_execute_command(c->u.command[0], time_travel, output);
@@ -326,6 +366,8 @@ execute_command (command_t c, bool time_travel)
       actual_size++;
       ptr++;
     }
+    simple_command(c, args);
+    /*
     //There is no redirection, this is a VERY SIMPLE command
     if(c->input == NULL && c->output == NULL) {
       fork_simple(args, NULL, c);
@@ -342,7 +384,7 @@ execute_command (command_t c, bool time_travel)
     }
     if(c->output != NULL) {
       fork_simple(args, c->output, c);
-    }
+      }*/
   } else 
   if(c->type == AND_COMMAND) {
     execute_command(c->u.command[0], time_travel);
