@@ -1,7 +1,0 @@
-(cat d &&  cat b) || cat a
-
-cat a; cat b
-
-sort < a | cat b - | tr A-Z a-z > c
-
-sort < a > x

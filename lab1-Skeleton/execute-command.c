@@ -149,12 +149,14 @@ void simple_command(command_t c, char **input)
 	      fprintf(stderr, "Error opening file: %s.", c->input);
 	      _exit(1);
 	    }
-	  if(dup2(file_ptr1, 0) < 0)
+	  int exit_status1 = dup2(file_ptr1, 0);
+	  if(exit_status1 < 0)
 	    {
 	      fprintf(stderr, "Dup2 error.");
 	      _exit(1);//check for errors here
 	    }
-	  if(close(file_ptr1) < 0)
+	  int exit_status2 = close(file_ptr1);
+	  if(exit_status2 < 0)
 	    {
 	      fprintf(stderr, "Problem closing file.");
 	      _exit(1);
@@ -168,12 +170,14 @@ void simple_command(command_t c, char **input)
 	      fprintf(stderr, "Error writing to file.");
 	      _exit(1);
 	    }
-	  if(dup2(file_ptr2, 1) < 0)
+	  int exit_status3 = dup2(file_ptr2, 1);
+	  if(exit_status3 < 0)
 	    {
 	      fprintf(stderr, "Dup2 error."); //check for errors here
 	      _exit(1);
 	    }
-	  if( close(file_ptr2) < 0)
+	  int exit_status4 = close(file_ptr2);
+	  if( exit_status4 < 0)
 	    {
 	      fprintf(stderr, "Problem closing file.");
 	      _exit(1);
@@ -238,37 +242,6 @@ subshell_execute_command (command_t c, bool time_travel, char* output)
       ptr++;
     }
     simple_command(c, args);
-    //There is no redirection, this is a VERY SIMPLE command
-    /* if(c->input == NULL && c->output == NULL) {
-      simple_command(c, args);
-    } 
-    //The left side TAKES IN data from the right side. right side must be
-    //file? Can it be a string, or another command?
-    if(c->input != NULL) {
-      int fd_in = open(c->input, O_RDWR);
-      if(fd_in < 0)
-	{
-	  fprintf(stderr, "Error");
-	}
-      if(dup2(fd_in, 0) < 0)
-	{
-	  fprintf(stderr, "Error");
-	}
-      if(close(fd_in) < 0)
-	{
-	  fprintf(stderr, "Error");
-	}
-      simple_command(c, args);
-      char* right_arg = malloc(sizeof(c->input)+1);
-      memcpy(right_arg, c->input, sizeof(c->input));
-      right_arg[strlen(c->input)] = '\0';
-      args[actual_size] = malloc(sizeof(right_arg));
-      memcpy(args[actual_size], right_arg, sizeof(right_arg));
-      fork_simple(args, c->output, c);
-    }
-    if(c->output != NULL) {
-       fork_simple(args, c->output, c);
-    }*/
   } else 
   if(c->type == AND_COMMAND) {
     execute_command(c->u.command[0], time_travel);
@@ -311,24 +284,6 @@ execute_command (command_t c, bool time_travel)
       ptr++;
     }
     simple_command(c, args);
-    /*
-    //There is no redirection, this is a VERY SIMPLE command
-    if(c->input == NULL && c->output == NULL) {
-      fork_simple(args, NULL, c);
-    } 
-    //The left side TAKES IN data from the right side. right side must be
-    //file? Can it be a string, or another command?
-    if(c->input != NULL) {
-      char* right_arg = malloc(sizeof(c->input)+1);
-      memcpy(right_arg, c->input, sizeof(c->input));
-      right_arg[strlen(c->input)] = '\0';
-      args[actual_size] = malloc(sizeof(right_arg));
-      memcpy(args[actual_size], right_arg, sizeof(right_arg));
-      fork_simple(args, c->output, c);
-    }
-    if(c->output != NULL) {
-      fork_simple(args, c->output, c);
-      }*/
   } else 
   if(c->type == AND_COMMAND) {
     execute_command(c->u.command[0], time_travel);
