@@ -14,41 +14,15 @@
 #include <sys/stat.h>
 
 int
-command_status (command_t c)
+command_status (command_t c) //return status of the command
 {
   return c->status;
 }
 
-/*void execute_no_time_travel(command_t c)
-{
-  switch(c->type)
-    {
-    case SIMPLE_COMMAND:
-      simple_command(c);
-      break;
-    case PIPE_COMMAND:
-      pipe_command(c);
-      break;
-    case AND_COMMAND:
-      and_command(c);
-    case OR_COMMAND:
-      or_command(c);
-    case SUBSHELL_COMMAND:
-      subshell_command(c);
-    case SEQUENCE_COMMAND:
-      sequence_command(c);
-      break;
-    default:
-      fprintf(stderr, "Command type is not known.");
-      exit(1);
-    }
-}
-*/
-
-void pipe_command(command_t c, bool time_travel)
+void pipe_command(command_t c, bool time_travel) //executing pipe command
 {
   int status;
-  int fd[2];
+  int fd[2]; //descriptors for pipe
   pid_t pid1;
   pid_t pid2;
   pid_t finished_process;
@@ -63,7 +37,7 @@ void pipe_command(command_t c, bool time_travel)
       fprintf(stderr, "Fork failed.");
       exit(1);
     }
-  if(pid1 > 0)
+  if(pid1 > 0) //still in the parent shell process
     {
       pid2 = fork();
       if(pid2 < 0)
@@ -73,9 +47,9 @@ void pipe_command(command_t c, bool time_travel)
 	}
       if(pid2 > 0)
 	{
-	  close(fd[0]);
+	  close(fd[0]); //remove all of the parent's ties to the pipe
 	  close(fd[1]);
-	  finished_process = waitpid(-1, &status, 0);
+	  finished_process = waitpid(-1, &status, 0); //wait for any process
 	  if(finished_process == pid1)
 	    {
 	      c->status = status;
@@ -89,9 +63,9 @@ void pipe_command(command_t c, bool time_travel)
 	      return;
 	    }
 	}
-      if(pid2 == 0)
+      if(pid2 == 0) //the first part of the pipe
 	{
-	  close(fd[0]);
+	  close(fd[0]); //close the read_end
 	  if(dup2(fd[1], 1) == -1)
 	    {
 	      fprintf(stderr, "Could not perform dup2.");
@@ -101,9 +75,9 @@ void pipe_command(command_t c, bool time_travel)
 	  _exit(c->u.command[0]->status);
 	}
     }
-  if(pid1 == 0)
+  if(pid1 == 0) //second part of the pipe
     {
-      close(fd[1]);
+      close(fd[1]); //close the write end
       if(dup2(fd[0], 0) == -1)
 	{
 	  fprintf(stderr, "Could not perform dup2.");
@@ -137,15 +111,15 @@ void sequence_command(command_t c, bool time_travel)
 	  fprintf(stderr, "Fork failed.");
 	  exit(1);
 	}
-      if(pid2 > 0)
+      if(pid2 > 0) //second part of the sequence command
 	{
-	  waitpid(pid2, &status, 0);
+	  waitpid(pid2, &status, 0); 
 	  execute_command(c->u.command[1], time_travel);
 	  _exit(c->u.command[1]->status);
 	}
       if(pid2 == 0)
 	{
-	  execute_command(c->u.command[0], time_travel);
+	  execute_command(c->u.command[0], time_travel); //first part of sequence command
 	  _exit(c->u.command[0]->status);
 	}
     }
@@ -167,16 +141,24 @@ void simple_command(command_t c, char **input)
     }
   if(pid == 0)
     {
-      if(c->input != NULL)
+      if(c->input != NULL) //setup input and output for redirection
 	{
 	  int file_ptr1 = open(c->input, O_RDWR);
 	  if(file_ptr1 < 0)
 	    {
-	      fprintf(stderr, "Error opening file.");
-	      return;
+	      fprintf(stderr, "Error opening file: %s.", c->input);
+	      _exit(1);
 	    }
-	  dup2(file_ptr1, 0); //check for errors here
-	  close(file_ptr1);
+	  if(dup2(file_ptr1, 0) < 0)
+	    {
+	      fprintf(stderr, "Dup2 error.");
+	      _exit(1);//check for errors here
+	    }
+	  if(close(file_ptr1) < 0)
+	    {
+	      fprintf(stderr, "Problem closing file.");
+	      _exit(1);
+	    }
 	}
       if(c->output != NULL)
 	{
@@ -184,10 +166,18 @@ void simple_command(command_t c, char **input)
 	  if(file_ptr2 < 0)
 	    {
 	      fprintf(stderr, "Error writing to file.");
-	      return;
+	      _exit(1);
 	    }
-	  dup2(file_ptr2, 1); //check for errors here
-	  close(file_ptr2);
+	  if(dup2(file_ptr2, 1) < 0)
+	    {
+	      fprintf(stderr, "Dup2 error."); //check for errors here
+	      _exit(1);
+	    }
+	  if( close(file_ptr2) < 0)
+	    {
+	      fprintf(stderr, "Problem closing file.");
+	      _exit(1);
+	    }
 	}
       execvp(input[0], input);
       fprintf(stderr, "Invalid command.");
@@ -304,6 +294,7 @@ subshell_execute_command (command_t c, bool time_travel, char* output)
   } else
   if(c->type == SUBSHELL_COMMAND) {
     subshell_execute_command(c->u.subshell_command, time_travel, output);
+     c->status = c->u.subshell_command->status;
   }
 }
 
