@@ -160,6 +160,10 @@ make_command_stream (int (*get_next_byte) (void *),
 //if this is the end of a comment
 //or if this is the end of a full command
      if(whole_file[i] == '\n'){
+       if(*start_ptr == whole_file[i]) {
+         start_ptr++;
+         continue;
+       }
        if(complete_new)
          continue;
        if(comment) {
