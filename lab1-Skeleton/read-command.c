@@ -141,11 +141,13 @@ make_command_stream (int (*get_next_byte) (void *),
          count++;
     }
   if(count == max_size) {
-    whole_file = realloc(whole_file, max_size+1);
+    whole_file = realloc(whole_file, max_size+2);
   }
-  whole_file[count] = '\0';
+  whole_file[count] = '\n';
+  count++;
+  whole_file[count+1] = '\0';
 //Read in whole file as a string and add null byte to end
-
+  int beginning = 0; //delete this
   int i = 0;
   int second_token = 0;
   char* start_ptr = whole_file;
@@ -160,6 +162,11 @@ make_command_stream (int (*get_next_byte) (void *),
 //if this is the end of a comment
 //or if this is the end of a full command
      if(whole_file[i] == '\n'){
+       if(beginning == 0 && i == 0) //delete this
+	 {
+	   beginning++;
+	   continue;
+	 }
        if(complete_new)
          continue;
        if(comment) {
