@@ -144,9 +144,9 @@ make_command_stream (int (*get_next_byte) (void *),
     whole_file = realloc(whole_file, max_size+2);
   }
   whole_file[count] = '\n';
+  count++;
   whole_file[count+1] = '\0';
 //Read in whole file as a string and add null byte to end
-
   int i = 0;
   int second_token = 0;
   char* start_ptr = whole_file;
