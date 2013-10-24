@@ -73,7 +73,7 @@ int check_right_valid(char* start, int redirect) {
 }
 
 //Function checks if newline is actually a complete command
-int complete_command(char* start, char* nline, int line) {
+int complete_command(char* start, char* nline, int line, int parentheses_open) {
   nline++;
   //Check if EOF
   if(*nline == NULL ) 
@@ -91,7 +91,14 @@ int complete_command(char* start, char* nline, int line) {
       else if(*nline == ';')  
         return 2;
       else if(is_valid_character(*nline)) {
-        nline++;
+        if(parentheses_open) {
+          nline++;
+          if(*nline == '\n')
+            *nline = ';';
+        } 
+        return 2;
+      }
+      /*  nline++;
 //If valid char before new line, check after new line for another new line 
         while(*(nline++) != '\0') {
           char x = *nline;
@@ -100,9 +107,7 @@ int complete_command(char* start, char* nline, int line) {
           else if( x == ' ' || x == '\t') 
             continue;
           else if(x == '(' || x == ')' || is_valid_character(x))
-            return 0;
-        }
-      }
+            return 0;*/
       else if(*nline == '<' || *nline == '>') {
         fprintf(stderr, "%i: Syntax error new line after redirection", line);
         exit(1);
@@ -179,12 +184,17 @@ make_command_stream (int (*get_next_byte) (void *),
            i++;
          continue;
        }
-       int result = complete_command(start_ptr, whole_file+i, line);
+       int result = complete_command(start_ptr, whole_file+i, line, parentheses_open);
 //Based on result, if it returns > 0 that means it is a complete command
        if(result >0) {
          if(parentheses_open) {
+         if(i == count-1) {
            fprintf(stderr, "%i: Syntax error no matching parentheses", line);
            exit(1);
+         }
+          continue;
+          // fprintf(stderr, "%i: Syntax error no matching parentheses", line);
+          // exit(1);
          }
          line+=2;
          int j = 0;
