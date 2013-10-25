@@ -27,4 +27,4 @@ void execute_command (command_t, bool);
 int command_status (command_t);
 
 /* Used instead of execute_command when performing parallelization*/
-void execute_timet_travel(command_stream_t command_stream);
+void execute_time_travel(command_stream_t command_stream);

@@ -24,6 +24,10 @@ struct command_node
   int write_dependencies_position;
   int write_dependencies_size;
   command_node_t next;
+  int prior_dep_size;
+  int prior_dep_position;
+  int future_dep_size;
+  int future_dep_position;
 };
 
 //dependency graph

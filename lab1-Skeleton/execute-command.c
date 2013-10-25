@@ -314,50 +314,75 @@ execute_command (command_t c, bool time_travel)
   }
 }
 
-void
+int
 create_dependencies(command_node_t no_dependency_head, command_node_t dependency_head, command_node_t temp)
 {
+  int marked_dependent;
+  marked_dependent = 0;
   command_node_t ptr;
   ptr = no_dependency_head;
+  //checking our one command through the no_dependency list
   while(ptr != NULL)
     {
-      int is_dependent;
+      int is_dependent; //flag to see if it is dependent
       is_dependent = 0;
       int i;
-      for(i = 0; i < ptr->read_dependencies_position; i++)
+      for(i = 0; i < ptr->read_dependencies_position; i++) //first we go through all of the independent command's read dependencies
 	{
 	  int j;
-	  for(j = 0; j < temp->write_dependencies_position; j++)
+	  for(j = 0; j < temp->write_dependencies_position; j++) //we then cross-reference with temp's write dependencies
 	    {
-	      if(temp->write_dependencies[j] == ptr->read_dependencies[i])
+	      if(*(temp->write_dependencies[j]) == *(ptr->read_dependencies[i])) //if any of our write dependencies match its read dependency, we're done
 		{
-		  is_dependent = 1;
+		  is_dependent = 1; 
 		  break;
 		}
 	    }
-	  if(is_dependent == 1)
+	  if(is_dependent == 1) //do not look for any more read/write dependencies
 	    {
 	      break;
 	    }
 	}
-      for(i = 0; i < ptr->write_dependencies_position; i++)
+      if(is_dependent == 1) //if there is a read/write dependency
+	{
+	  marked_dependent = 1;
+	  if(ptr->future_dep_position == ptr->future_dep_size)
+	    {
+	      ptr->future_dep_size += 5;
+	      ptr->future_dependents = realloc(ptr->future_dependents, ptr->future_dep_size*(sizeof(command_node_t)));
+	    }
+	  ptr->future_dependents[ptr->future_dep_position] = temp; //add temp to future dependency
+	  ptr->future_dep_position++;
+	  if(temp->prior_dep_position == temp->prior_dep_size)
+	    {
+	      temp->prior_dep_size += 5;
+	      temp->prior_dependencies = realloc(temp->prior_dependencies, temp->prior_dep_size*(sizeof(command_node_t)));
+	    }
+	  temp->prior_dependencies[temp->prior_dep_position] = ptr; //add the independent node to temp's prior dependency
+	  temp->prior_dep_position++;
+	  is_dependent = 0; 
+	  ptr = ptr->next; //move on to the next independent command
+	  continue;
+	}
+
+      for(i = 0; i < ptr->write_dependencies_position; i++) //checking for write/write or write/read dependencies
 	{
 	  int k;
 	  for(k = 0; k < temp->read_dependencies_position; k++)
 	    {
-	      if(temp->read_dependencies[k] == ptr->write_dependencies[i])
+	      if(*(temp->read_dependencies[k]) == *(ptr->write_dependencies[i])) //if there is a write/read dependency
 		{
 		  is_dependent = 1;
 		  break;
 		}
 	    }
-	  if(is_dependent == 1)
+	  if(is_dependent == 1) //no need to cheak for write/write dependency
 	    {
 	      break;
 	    }
-	  for(k = 0; k < temp->write_dependencies_position; k++)
+	  for(k = 0; k < temp->write_dependencies_position; k++) 
 	    {
-	      if(temp->write_dependencies[k] == ptr->write_dependencies[i])
+	      if(*(temp->write_dependencies[k]) == *(ptr->write_dependencies[i])) //if there is a write/write dependency
 		{
 		  is_dependent = 1;
 		  break;
@@ -370,54 +395,90 @@ create_dependencies(command_node_t no_dependency_head, command_node_t dependency
 	}
       if(is_dependent == 1)
 	{
-	  ptr->future_dependents = temp;
-	  temp->prior_dependencies = ptr;
-	  is_dependent = 0;
-	  ptr = ptr->next;
+	  marked_dependent = 1;
+	  if(ptr->future_dep_position == ptr->future_dep_size)
+	    {
+	      ptr->future_dep_size += 5;
+	      ptr->future_dependents = realloc(ptr->future_dependents, ptr->future_dep_size*(sizeof(command_node_t)));
+	    }
+	  ptr->future_dependents[ptr->future_dep_position] = temp; //add temp to future dependency
+	  ptr->future_dep_position++;
+	  if(temp->prior_dep_position == temp->prior_dep_size)
+	    {
+	      temp->prior_dep_size += 5;
+	      temp->prior_dependencies = realloc(temp->prior_dependencies, temp->prior_dep_size*(sizeof(command_node_t)));
+	    }
+	  temp->prior_dependencies[temp->prior_dep_position] = ptr; //add the independent node to temp's prior dependency
+	  temp->prior_dep_position++;
+	  is_dependent = 0; 
+	  ptr = ptr->next; //move on to the next independent command
 	  continue;
 	}
       ptr = ptr->next;
     }
-  ptr = dependency_head;
+
+  ptr = dependency_head; //now go through the dependent list and check for dependencies
   while(ptr != NULL)
     {
-      int is_dependent;
+      int is_dependent; //flag to see if it is dependent
       is_dependent = 0;
       int i;
-      for(i = 0; i < ptr->read_dependencies_position; i++)
+      for(i = 0; i < ptr->read_dependencies_position; i++) //first we go through all of the independent command's read dependencies
 	{
 	  int j;
-	  for(j = 0; j < temp->write_dependencies_position; j++)
+	  for(j = 0; j < temp->write_dependencies_position; j++) //we then cross-reference with temp's write dependencies
 	    {
-	      if(temp->write_dependencies[j] == ptr->read_dependencies[i])
+	      if(*(temp->write_dependencies[j]) == *(ptr->read_dependencies[i])) //if any of our write dependencies match its read dependency, we're done
 		{
-		  is_dependent = 1;
+		  is_dependent = 1; 
 		  break;
 		}
 	    }
-	  if(is_dependent == 1)
+	  if(is_dependent == 1) //do not look for any more read/write dependencies
 	    {
 	      break;
 	    }
 	}
-      for(i = 0; i < ptr->write_dependencies_position; i++)
+      if(is_dependent == 1) //if there is a read/write dependency
+	{
+	  marked_dependent = 1;
+	  if(ptr->future_dep_position == ptr->future_dep_size)
+	    {
+	      ptr->future_dep_size += 5;
+	      ptr->future_dependents = realloc(ptr->future_dependents, ptr->future_dep_size*(sizeof(command_node_t)));
+	    }
+	  ptr->future_dependents[ptr->future_dep_position] = temp; //add temp to future dependency
+	  ptr->future_dep_position++;
+	  if(temp->prior_dep_position == temp->prior_dep_size)
+	    {
+	      temp->prior_dep_size += 5;
+	      temp->prior_dependencies = realloc(temp->prior_dependencies, temp->prior_dep_size*(sizeof(command_node_t)));
+	    }
+	  temp->prior_dependencies[temp->prior_dep_position] = ptr; //add the independent node to temp's prior dependency
+	  temp->prior_dep_position++;
+	  is_dependent = 0; 
+	  ptr = ptr->next; //move on to the next independent command
+	  continue;
+	}
+      
+      for(i = 0; i < ptr->write_dependencies_position; i++) //checking for write/write or write/read dependencies
 	{
 	  int k;
 	  for(k = 0; k < temp->read_dependencies_position; k++)
 	    {
-	      if(temp->read_dependencies[k] == ptr->write_dependencies[i])
+	      if(*(temp->read_dependencies[k]) == *(ptr->write_dependencies[i])) //if there is a write/read dependency
 		{
 		  is_dependent = 1;
 		  break;
 		}
 	    }
-	  if(is_dependent == 1)
+	  if(is_dependent == 1) //no need to cheak for write/write dependency
 	    {
 	      break;
 	    }
-	  for(k = 0; k < temp->write_dependencies_position; k++)
+	  for(k = 0; k < temp->write_dependencies_position; k++) 
 	    {
-	      if(temp->write_dependencies[k] == ptr->write_dependencies[i])
+	      if(*(temp->write_dependencies[k]) == *(ptr->write_dependencies[i])) //if there is a write/write dependency
 		{
 		  is_dependent = 1;
 		  break;
@@ -430,17 +491,79 @@ create_dependencies(command_node_t no_dependency_head, command_node_t dependency
 	}
       if(is_dependent == 1)
 	{
-	  ptr->future_dependents = temp;
-	  temp->prior_dependencies = ptr;
-	  is_dependent = 0;
-	  ptr = ptr->next;
+	  marked_dependent = 1;
+	  if(ptr->future_dep_position == ptr->future_dep_size)
+	    {
+	      ptr->future_dep_size += 5;
+	      ptr->future_dependents = realloc(ptr->future_dependents, ptr->future_dep_size*(sizeof(command_node_t)));
+	    }
+	  ptr->future_dependents[ptr->future_dep_position] = temp; //add temp to future dependency
+	  ptr->future_dep_position++;
+	  if(temp->prior_dep_position == temp->prior_dep_size)
+	    {
+	      temp->prior_dep_size += 5;
+	      temp->prior_dependencies = realloc(temp->prior_dependencies, temp->prior_dep_size*(sizeof(command_node_t)));
+	    }
+	  temp->prior_dependencies[temp->prior_dep_position] = ptr; //add the independent node to temp's prior dependency
+	  temp->prior_dep_position++;
+	  is_dependent = 0; 
+	  ptr = ptr->next; //move on to the next independent command
 	  continue;
 	}
       ptr = ptr->next;
     }
-  
+  if(marked_dependent == 1) //add command node to either no dependency or dependency list
+    {
+      ptr = dependency_head;
+      if(dependency_head == NULL) //used to be dependency_head = temp. need to figure out why that is wrong
+	{/*
+	  dependency_head = malloc(sizeof(struct command_node));
+       	  dependency_head->read_dependencies = malloc(temp->read_dependencies_size*sizeof(char*));
+	  dependency_head->read_dependencies = temp->read_dependencies;
+	  dependency_head->write_dependencies = malloc(temp->write_dependencies_size*sizeof(char*));
+	  dependency_head->write_dependencies = temp->write_dependencies;
+	  dependency_head->cmd = temp->cmd;
+	  dependency_head->prior_dependencies = malloc(temp->prior_dep_size*sizeof(command_node_t));
+	  dependency_head->prior_dependencies = temp->prior_dependencies;
+	  dependency_head->future_dependents = malloc(temp->future_dep_size*sizeof(command_node_t));
+	  dependency_head->future_dependents = temp->future_dependents;
+	  dependency_head->pid = -1; //set pid to a negative number to clarify in execution
+	  dependency_head->read_dependencies_position = temp->read_dependencies_position;
+	  dependency_head->read_dependencies_size = temp->read_dependencies_size;
+	  dependency_head->write_dependencies_position = temp->write_dependencies_position;
+	  dependency_head->write_dependencies_size = temp->write_dependencies_size;
+	  dependency_head->next = temp->next;
+	  dependency_head->prior_dep_size = temp->prior_dep_size;
+	  dependency_head->prior_dep_position = temp->prior_dep_position;
+	  dependency_head->future_dep_size = temp->future_dep_size;
+	  dependency_head->future_dep_position = temp->future_dep_position;*/
+	  return 1;
+	}
+      else
+	{
+	  while(ptr->next != NULL)
+	    {
+	      ptr = ptr->next;
+	    }
+	  ptr->next = temp;
+	  return 2;
+	}
+    }
+  else
+    {
+      ptr = no_dependency_head;
+      while(ptr->next != NULL) //stop at the last node
+	{
+	  ptr = ptr->next;
+	}
+      ptr->next = temp;
+      return 0;
+    }
+  return 0;
 }
 
+
+//add all read/write dependencies of an individual command_node
 void  
 add_dependency_words(command_node_t x, command_t y)
 {
@@ -460,34 +583,34 @@ add_dependency_words(command_node_t x, command_t y)
       break;
     case SIMPLE_COMMAND:
       temp = parse(*(y->u.word));
-      for(i = 0; temp[i] != '\0'; i++)
+      for(i = 1; temp[i] != '\0'; i++) //for simple command, add all files to read dependency
 	{
 	  if(x->read_dependencies_position == x->read_dependencies_size)
 	    {
 	      x->read_dependencies_size += 5;
 	      x = realloc(x, x->read_dependencies_size*(sizeof(char*)));
 	    }
-	  x->read_dependencies[i] = temp[i];
+	  x->read_dependencies[x->read_dependencies_position] = temp[i]; //add the dependencies to the correct position
 	  x->read_dependencies_position++;
 	}
-      if(y->input != NULL)
+      if(y->input != NULL) //also add input to read dependency
 	{
 	  if(x->read_dependencies_position == x->read_dependencies_size)
 	    {
 	      x->read_dependencies_size += 5;
 	      x = realloc(x, x->read_dependencies_size*(sizeof(char*)));
 	    } 
-	  x->read_dependencies[i] = y->input;
+	  x->read_dependencies[x->read_dependencies_position] = y->input;
 	  x->read_dependencies_position++;
 	}
-      if(y->output != NULL)
+      if(y->output != NULL) //if there is redirection output, add to write dependency
 	{
 	  if(x->write_dependencies_position == x->write_dependencies_size)
 	    {
 	      x->write_dependencies_size += 5;
 	      x = realloc(x, x->write_dependencies_size*(sizeof(char*)));
 	    } 
-	  x->write_dependencies[i] = y->output;
+	  x->write_dependencies[x->write_dependencies_position] = y->output; //add the dependencies to the correct position
 	  x->write_dependencies_position++;
 	}
       break;
@@ -495,7 +618,7 @@ add_dependency_words(command_node_t x, command_t y)
 }
 
 
-
+//executing a command stream in parallel
 void
 execute_time_travel(command_stream_t command_stream)
 {
@@ -506,40 +629,55 @@ execute_time_travel(command_stream_t command_stream)
   dependency_head = NULL;
   no_dependency_head = NULL;
   command_number = 0;
+  //read command stream one command at a time
   while((command = read_command_stream(command_stream)))
     {
-      if(command_number == 0)
+      if(command_number == 0) //first command is automatically sent to no dependency list
 	{
 	  no_dependency_head = malloc(sizeof(struct command_node));
        	  no_dependency_head->read_dependencies = malloc(5*sizeof(char*));
 	  no_dependency_head->write_dependencies = malloc(5*sizeof(char*));
 	  no_dependency_head->cmd = command;
-	  no_dependency_head->prior_dependencies = NULL;
-	  no_dependency_head->future_dependents = NULL;
-	  no_dependency_head->pid = -1;
+	  no_dependency_head->prior_dependencies = malloc(5*sizeof(command_node_t));
+	  no_dependency_head->future_dependents = malloc(5*sizeof(command_node_t));
+	  no_dependency_head->pid = -1; //set pid to a negative number to clarify in execution
 	  no_dependency_head->read_dependencies_position = 0;
 	  no_dependency_head->read_dependencies_size = 5;
 	  no_dependency_head->write_dependencies_position = 0;
 	  no_dependency_head->write_dependencies_size = 5;
 	  no_dependency_head->next = NULL;
+	  no_dependency_head->prior_dep_size = 5;
+	  no_dependency_head->prior_dep_position = 0;
+	  no_dependency_head->future_dep_size = 5;
+	  no_dependency_head->future_dep_position = 0;
 	  add_dependency_words(no_dependency_head, command);
 	  command_number++;
 	  continue;
 	}
+      //for all the commands afterwards, initialize, add words to dependency list and construct dependency graph
       command_node_t temp = malloc(sizeof(struct command_node));
       temp->read_dependencies = malloc(5*sizeof(char*));
       temp->write_dependencies = malloc(5*sizeof(char*));
       temp->cmd = command;
-      temp->prior_dependencies = NULL;
-      temp->future_dependents = NULL;
+      temp->prior_dependencies = malloc(5*sizeof(command_node_t));
+      temp->future_dependents = malloc(5*sizeof(command_node_t));
       temp->pid = -1;
       temp->read_dependencies_position = 0;
       temp->read_dependencies_size = 5;
       temp->write_dependencies_position = 0;
       temp->write_dependencies_size = 5;
       temp->next = NULL;
+      temp->prior_dep_size = 5;
+      temp->prior_dep_position = 0;
+      temp->future_dep_size = 5;
+      temp->future_dep_position = 0;
       add_dependency_words(temp, command);
-      create_dependencies(no_dependency_head, dependency_head, temp);
+      int dep;
+      dep = create_dependencies(no_dependency_head, dependency_head, temp);
+      if(dep == 1) //must be a better way to do this, if this is the first command in the dependency graph, just set it to temp
+	{
+	  dependency_head = temp;
+	}
       temp = NULL;
      }
     //Sarah's code for executing in parallel
