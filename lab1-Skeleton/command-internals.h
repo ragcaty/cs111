@@ -1,5 +1,5 @@
 // UCLA CS 111 Lab 1 command internals
-
+#include <sys/types.h>
 enum command_type
   {
     AND_COMMAND,         // A && B
@@ -9,6 +9,29 @@ enum command_type
     SIMPLE_COMMAND,      // a simple command
     SUBSHELL_COMMAND,    // ( A )
   };
+
+//nodes in the dependency graph
+struct command_node
+{
+  char **read_dependencies;
+  char **write_dependencies;
+  command_t cmd;
+  command_node_t *prior_dependencies;
+  command_node_t *future_dependents;
+  pid_t pid;
+  int read_dependencies_position;
+  int read_dependencies_size;
+  int write_dependencies_position;
+  int write_dependencies_size;
+  command_node_t next;
+};
+
+//dependency graph
+struct command_graph
+{
+  command_node_t no_dependency;
+  command_node_t dependency;
+};
 
 // Data associated with a command.
 struct command

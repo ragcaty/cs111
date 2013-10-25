@@ -313,3 +313,234 @@ execute_command (command_t c, bool time_travel)
     c->status = c->u.subshell_command->status;
   }
 }
+
+void
+create_dependencies(command_node_t no_dependency_head, command_node_t dependency_head, command_node_t temp)
+{
+  command_node_t ptr;
+  ptr = no_dependency_head;
+  while(ptr != NULL)
+    {
+      int is_dependent;
+      is_dependent = 0;
+      int i;
+      for(i = 0; i < ptr->read_dependencies_position; i++)
+	{
+	  int j;
+	  for(j = 0; j < temp->write_dependencies_position; j++)
+	    {
+	      if(temp->write_dependencies[j] == ptr->read_dependencies[i])
+		{
+		  is_dependent = 1;
+		  break;
+		}
+	    }
+	  if(is_dependent == 1)
+	    {
+	      break;
+	    }
+	}
+      for(i = 0; i < ptr->write_dependencies_position; i++)
+	{
+	  int k;
+	  for(k = 0; k < temp->read_dependencies_position; k++)
+	    {
+	      if(temp->read_dependencies[k] == ptr->write_dependencies[i])
+		{
+		  is_dependent = 1;
+		  break;
+		}
+	    }
+	  if(is_dependent == 1)
+	    {
+	      break;
+	    }
+	  for(k = 0; k < temp->write_dependencies_position; k++)
+	    {
+	      if(temp->write_dependencies[k] == ptr->write_dependencies[i])
+		{
+		  is_dependent = 1;
+		  break;
+		}
+	    }
+	  if(is_dependent == 1)
+	    {
+	      break;
+	    }
+	}
+      if(is_dependent == 1)
+	{
+	  ptr->future_dependents = temp;
+	  temp->prior_dependencies = ptr;
+	  is_dependent = 0;
+	  ptr = ptr->next;
+	  continue;
+	}
+      ptr = ptr->next;
+    }
+  ptr = dependency_head;
+  while(ptr != NULL)
+    {
+      int is_dependent;
+      is_dependent = 0;
+      int i;
+      for(i = 0; i < ptr->read_dependencies_position; i++)
+	{
+	  int j;
+	  for(j = 0; j < temp->write_dependencies_position; j++)
+	    {
+	      if(temp->write_dependencies[j] == ptr->read_dependencies[i])
+		{
+		  is_dependent = 1;
+		  break;
+		}
+	    }
+	  if(is_dependent == 1)
+	    {
+	      break;
+	    }
+	}
+      for(i = 0; i < ptr->write_dependencies_position; i++)
+	{
+	  int k;
+	  for(k = 0; k < temp->read_dependencies_position; k++)
+	    {
+	      if(temp->read_dependencies[k] == ptr->write_dependencies[i])
+		{
+		  is_dependent = 1;
+		  break;
+		}
+	    }
+	  if(is_dependent == 1)
+	    {
+	      break;
+	    }
+	  for(k = 0; k < temp->write_dependencies_position; k++)
+	    {
+	      if(temp->write_dependencies[k] == ptr->write_dependencies[i])
+		{
+		  is_dependent = 1;
+		  break;
+		}
+	    }
+	  if(is_dependent == 1)
+	    {
+	      break;
+	    }
+	}
+      if(is_dependent == 1)
+	{
+	  ptr->future_dependents = temp;
+	  temp->prior_dependencies = ptr;
+	  is_dependent = 0;
+	  ptr = ptr->next;
+	  continue;
+	}
+      ptr = ptr->next;
+    }
+  
+}
+
+void  
+add_dependency_words(command_node_t x, command_t y)
+{
+  int i;
+  char **temp;
+  switch(y->type)
+    {
+    case AND_COMMAND:
+    case OR_COMMAND:
+    case SEQUENCE_COMMAND:
+    case PIPE_COMMAND:
+      add_dependency_words(x, y->u.command[0]);
+      add_dependency_words(x, y->u.command[1]);
+      break;
+    case SUBSHELL_COMMAND:
+      add_dependency_words(x, y->u.subshell_command);
+      break;
+    case SIMPLE_COMMAND:
+      temp = parse(*(y->u.word));
+      for(i = 0; temp[i] != '\0'; i++)
+	{
+	  if(x->read_dependencies_position == x->read_dependencies_size)
+	    {
+	      x->read_dependencies_size += 5;
+	      x = realloc(x, x->read_dependencies_size*(sizeof(char*)));
+	    }
+	  x->read_dependencies[i] = temp[i];
+	  x->read_dependencies_position++;
+	}
+      if(y->input != NULL)
+	{
+	  if(x->read_dependencies_position == x->read_dependencies_size)
+	    {
+	      x->read_dependencies_size += 5;
+	      x = realloc(x, x->read_dependencies_size*(sizeof(char*)));
+	    } 
+	  x->read_dependencies[i] = y->input;
+	  x->read_dependencies_position++;
+	}
+      if(y->output != NULL)
+	{
+	  if(x->write_dependencies_position == x->write_dependencies_size)
+	    {
+	      x->write_dependencies_size += 5;
+	      x = realloc(x, x->write_dependencies_size*(sizeof(char*)));
+	    } 
+	  x->write_dependencies[i] = y->output;
+	  x->write_dependencies_position++;
+	}
+      break;
+    }
+}
+
+
+
+void
+execute_time_travel(command_stream_t command_stream)
+{
+  command_t command;
+  command_node_t dependency_head;
+  command_node_t no_dependency_head;
+  int command_number;
+  dependency_head = NULL;
+  no_dependency_head = NULL;
+  command_number = 0;
+  while((command = read_command_stream(command_stream)))
+    {
+      if(command_number == 0)
+	{
+	  no_dependency_head = malloc(sizeof(struct command_node));
+       	  no_dependency_head->read_dependencies = malloc(5*sizeof(char*));
+	  no_dependency_head->write_dependencies = malloc(5*sizeof(char*));
+	  no_dependency_head->cmd = command;
+	  no_dependency_head->prior_dependencies = NULL;
+	  no_dependency_head->future_dependents = NULL;
+	  no_dependency_head->pid = -1;
+	  no_dependency_head->read_dependencies_position = 0;
+	  no_dependency_head->read_dependencies_size = 5;
+	  no_dependency_head->write_dependencies_position = 0;
+	  no_dependency_head->write_dependencies_size = 5;
+	  no_dependency_head->next = NULL;
+	  add_dependency_words(no_dependency_head, command);
+	  command_number++;
+	  continue;
+	}
+      command_node_t temp = malloc(sizeof(struct command_node));
+      temp->read_dependencies = malloc(5*sizeof(char*));
+      temp->write_dependencies = malloc(5*sizeof(char*));
+      temp->cmd = command;
+      temp->prior_dependencies = NULL;
+      temp->future_dependents = NULL;
+      temp->pid = -1;
+      temp->read_dependencies_position = 0;
+      temp->read_dependencies_size = 5;
+      temp->write_dependencies_position = 0;
+      temp->write_dependencies_size = 5;
+      temp->next = NULL;
+      add_dependency_words(temp, command);
+      create_dependencies(no_dependency_head, dependency_head, temp);
+      temp = NULL;
+     }
+    //Sarah's code for executing in parallel
+}
