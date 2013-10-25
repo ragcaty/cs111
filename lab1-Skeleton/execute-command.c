@@ -138,7 +138,6 @@ void simple_command(command_t c, char **input)
     {
       waitpid(pid, &status, 0); 
       c->status = status;
-      printf("DONE \n");
     }
   if(pid == 0)
     {
@@ -517,27 +516,7 @@ create_dependencies(command_node_t no_dependency_head, command_node_t dependency
     {
       ptr = dependency_head;
       if(dependency_head == NULL) //used to be dependency_head = temp. need to figure out why that is wrong
-	{/*
-	  dependency_head = malloc(sizeof(struct command_node));
-       	  dependency_head->read_dependencies = malloc(temp->read_dependencies_size*sizeof(char*));
-	  dependency_head->read_dependencies = temp->read_dependencies;
-	  dependency_head->write_dependencies = malloc(temp->write_dependencies_size*sizeof(char*));
-	  dependency_head->write_dependencies = temp->write_dependencies;
-	  dependency_head->cmd = temp->cmd;
-	  dependency_head->prior_dependencies = malloc(temp->prior_dep_size*sizeof(command_node_t));
-	  dependency_head->prior_dependencies = temp->prior_dependencies;
-	  dependency_head->future_dependents = malloc(temp->future_dep_size*sizeof(command_node_t));
-	  dependency_head->future_dependents = temp->future_dependents;
-	  dependency_head->pid = -1; //set pid to a negative number to clarify in execution
-	  dependency_head->read_dependencies_position = temp->read_dependencies_position;
-	  dependency_head->read_dependencies_size = temp->read_dependencies_size;
-	  dependency_head->write_dependencies_position = temp->write_dependencies_position;
-	  dependency_head->write_dependencies_size = temp->write_dependencies_size;
-	  dependency_head->next = temp->next;
-	  dependency_head->prior_dep_size = temp->prior_dep_size;
-	  dependency_head->prior_dep_position = temp->prior_dep_position;
-	  dependency_head->future_dep_size = temp->future_dep_size;
-	  dependency_head->future_dep_position = temp->future_dep_position;*/
+	{
 	  return 1;
 	}
       else
@@ -681,27 +660,33 @@ execute_time_travel(command_stream_t command_stream, command_t last_command)
 	}
       temp = NULL;
      }
-    //Sarah's code for executing in parallel
+    //Now we have two lists, one for independent and dependent commands
+    //Start searching through the independent commands
     while(no_dependency_head != NULL) {
       pid_t pid1; 
       pid1 = fork();
       if(pid1 < 0) {
         fprintf(stderr, "Fork failure3");
         _exit(1);
+    //If this is the child process, then start executing the command
       } else if(pid1 == 0) {
         execute_command(no_dependency_head->cmd, 0);
         _exit(1);
+    //For parent class, set pid = pid, so we know the command has started, and move onto the next command in the list
       } else {
         no_dependency_head->pid = pid1;
         last_command = no_dependency_head->cmd; 
         no_dependency_head = no_dependency_head->next;  
       }
     }
+//Find the end of the dependent node list incase we need to move a node to the back
     command_node_t end_ptr = dependency_head;
     if(end_ptr != NULL) {
       while(end_ptr->next != NULL) 
         end_ptr = end_ptr->next;
     }
+//For the dependent list, check if the previous commands it depends on have started
+//Else, push it to the back of the list
     int pos = 0;
     while(dependency_head != NULL) {
       int pushed_back = 0;
@@ -723,12 +708,15 @@ execute_time_travel(command_stream_t command_stream, command_t last_command)
       if(pid1 < 0) {
         fprintf(stderr, "Fork failure");
         _exit(1);
+//For the child, make sure that the previous commands have finished executing, THEN execute the current
+//command
       } else if(pid1 == 0) {
         for(; pos < dependency_head->prior_dep_position; pos++) {
           waitpid(dependency_head->prior_dependencies[pos]->pid, status, 0);
         }
         execute_command(dependency_head->cmd, 0);
         _exit(1);
+//Set the dependent node pid = pid so we know it has started/done, move onto next command in list
       } else {
         dependency_head->pid = pid1;
         last_command = dependency_head->cmd;
