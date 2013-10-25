@@ -71,8 +71,7 @@ main (int argc, char **argv)
     }
   if(time_travel)
     {
-      execute_time_travel(command_stream);
+      execute_time_travel(command_stream, last_command);      
     }
-
   return print_tree || !last_command ? 0 : command_status (last_command);
 }

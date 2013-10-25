@@ -138,6 +138,7 @@ void simple_command(command_t c, char **input)
     {
       waitpid(pid, &status, 0); 
       c->status = status;
+      printf("DONE \n");
     }
   if(pid == 0)
     {
@@ -297,7 +298,7 @@ execute_command (command_t c, bool time_travel)
   } else if(c->type == OR_COMMAND) {
     execute_command(c->u.command[0], time_travel);
     if(c->u.command[0]->status != 0) {
-      execute_command(c->u.command[1], time_travel);
+     execute_command(c->u.command[1], time_travel);
       c->status = c->u.command[1]->status;
     }
     c->status = c->u.command[0]->status;
@@ -620,7 +621,7 @@ add_dependency_words(command_node_t x, command_t y)
 
 //executing a command stream in parallel
 void
-execute_time_travel(command_stream_t command_stream)
+execute_time_travel(command_stream_t command_stream, command_t last_command)
 {
   command_t command;
   command_node_t dependency_head;
@@ -681,4 +682,58 @@ execute_time_travel(command_stream_t command_stream)
       temp = NULL;
      }
     //Sarah's code for executing in parallel
+    while(no_dependency_head != NULL) {
+      pid_t pid1; 
+      pid1 = fork();
+      if(pid1 < 0) {
+        fprintf(stderr, "Fork failure3");
+        _exit(1);
+      } else if(pid1 == 0) {
+        execute_command(no_dependency_head->cmd, 0);
+        _exit(1);
+      } else {
+        no_dependency_head->pid = pid1;
+        last_command = no_dependency_head->cmd; 
+        no_dependency_head = no_dependency_head->next;  
+      }
+    }
+    command_node_t end_ptr = dependency_head;
+    if(end_ptr != NULL) {
+      while(end_ptr->next != NULL) 
+        end_ptr = end_ptr->next;
+    }
+    int pos = 0;
+    while(dependency_head != NULL) {
+      int pushed_back = 0;
+      for(; pos < dependency_head->prior_dep_position; pos++) {
+        if (dependency_head->prior_dependencies[pos]->pid == -1){
+          command_node_t copy = dependency_head;
+          end_ptr = copy;
+          dependency_head = dependency_head->next;
+          pushed_back = 1;
+          break;
+        }
+      }
+      if(pushed_back)
+        continue;   
+      pos = 0; 
+      int status;
+      pid_t pid1;
+      pid1 = fork();
+      if(pid1 < 0) {
+        fprintf(stderr, "Fork failure");
+        _exit(1);
+      } else if(pid1 == 0) {
+        for(; pos < dependency_head->prior_dep_position; pos++) {
+          waitpid(dependency_head->prior_dependencies[pos]->pid, status, 0);
+        }
+        execute_command(dependency_head->cmd, 0);
+        _exit(1);
+      } else {
+        dependency_head->pid = pid1;
+        last_command = dependency_head->cmd;
+        dependency_head = dependency_head->next;
+      }
+    } 
+      
 }
