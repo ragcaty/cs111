@@ -1,0 +1,13 @@
+ls
+ls -l
+ls -a
+echo this is stupid > a
+echo whee > b
+echo this better fucking work > c
+cat c
+cat b
+cat a
+ls -l | wc -l
+cat c
+cat b
+cat < a > f

@@ -220,8 +220,9 @@ parse(char* string)
     end++;
     start = end;
     i++;
+    args[i] = '\0'; // delete
     if(i == size_args) {
-      size_args *= 2;
+      size_args += 2; //delete 
       args = realloc(args, size_args*sizeof(char*)); 
     }
   }
