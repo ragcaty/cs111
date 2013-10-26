@@ -221,7 +221,7 @@ parse(char* string)
     start = end;
     i++;
     if(i == size_args) {
-      size_args *= 2;
+      size_args += 1; //delete this
       args = realloc(args, size_args*sizeof(char*)); 
     }
   }
