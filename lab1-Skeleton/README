@@ -45,3 +45,5 @@ emoving preceding and trailing whitespace.
 
 EXECUTE_COMMAND implementation:
 For each command passed in to execute_command, we separate it into the different command types and pass it into their own functions to execute. Every command  will eventually be broken down into a SIMPLE_COMMAND and executed. To execute a simple command, we create a child process and invoke execvp(). For pipe commands, we create two child processes from the same parent and use a pipe to redirect the output of the first part of the pipe as the input of the second part of the pipe. AND/OR commands are executed based on their given parameters. 
+
+ODDTHING: When running in parallel, after the last command has executed, it seems as though the program is hanging since it is just a blank line instead of the bash prompt again. However, if you resize the terminal, the bash prompt appears. So it's like invisible...but there. We first thought our program was hanging or freezing somewhere but that was not it. Causes confusion, but should not mess with integrity of program
