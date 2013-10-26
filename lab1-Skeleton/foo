@@ -14,7 +14,7 @@ echo overwrite file > testfiles
 
 # Input Redirection
 cat < testfiles
-cat < FILEDOESNOTEXIST  # should produce an error in both cases
+cat < a  # should produce an error in both cases
 
 # Simultaneous Output and Input Redirection
 sort < testfiles > testSorted

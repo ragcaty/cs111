@@ -89,14 +89,14 @@ int complete_command(char* start, char* nline, int line, int parentheses_open) {
         return 1;
       }
       else if(*nline == ';')  
-        return 2;
+        return 1;
       else if(is_valid_character(*nline)) {
         if(parentheses_open) {
           nline++;
           if(*nline == '\n')
             *nline = ';';
         } 
-        return 2;
+        return 1;
       }
       /*  nline++;
 //If valid char before new line, check after new line for another new line 
@@ -158,14 +158,12 @@ make_command_stream (int (*get_next_byte) (void *),
   char* start_ptr = whole_file;
   int parentheses_open = 0;
   int comment = 0;
-  int prev_char = 0;
+  int result;
+  int comment_command = 0;
+  char* comment_ptr = NULL;
+  char* end_comment = NULL;
   for(; i<count; i++ ) {
-    if(stream_t->full_command_position == stream_t->full_command_size)
-      {
-	stream_t->full_command_size += 10;
-	stream_t->full_commands = realloc(stream_t->full_commands, stream_t->full_command_size*(sizeof(char*)));
-      }
-//Going character by character, skip comments
+   //Going character by character, skip comments
      second_token = 0;
      if(whole_file[i] == ' ' || whole_file[i] == '\t')
        continue;
@@ -173,25 +171,34 @@ make_command_stream (int (*get_next_byte) (void *),
 //if this is the end of a comment
 //or if this is the end of a full command
      if(whole_file[i] == '\n'){
-       if(beginning == 0 && i == 0) //delete this
+       if(*start_ptr == whole_file[i]) //delete this
 	 {
-	   beginning++;
+	   start_ptr++;
+       line++;
 	   continue;
 	 }
        if(complete_new)
          continue;
        if(comment) { //fix this later too
-         line++;
-         comment = 0;
-         start_ptr = &whole_file[i];
-         while(*start_ptr == '\n') 
-           start_ptr++;
-         while(whole_file[i+1] == '\n')
-           i++;
-	 //if(prev_char == 0) //maybe delete
-	 continue;
+         if(comment_ptr != start_ptr) {
+           comment_command = 1;
+           result = complete_command(start_ptr, comment_ptr, line, parentheses_open);
+           end_comment = &whole_file[i];
+         } else {
+           line++;
+           comment = 0;
+           comment_ptr = NULL;
+           start_ptr = &whole_file[i];
+           while(*start_ptr == '\n') 
+             start_ptr++;
+           while(whole_file[i+1] == '\n')
+             i++;
+           continue;
+         }
        }
-       int result = complete_command(start_ptr, whole_file+i, line, parentheses_open);
+       if(comment_command != 1) {
+         result = complete_command(start_ptr, whole_file+i, line, parentheses_open);
+       }
 //Based on result, if it returns > 0 that means it is a complete command
        if(result >0) {
          if(parentheses_open) {
@@ -200,39 +207,75 @@ make_command_stream (int (*get_next_byte) (void *),
            exit(1);
          }
           continue;
-          // fprintf(stderr, "%i: Syntax error no matching parentheses", line);
-          // exit(1);
          }
-         line+=2;
+         line+=result;
          int j = 0;
          int prev_space = 0;
+         if(stream_t->full_command_position == stream_t->full_command_size)
+         {
+           stream_t->full_command_size += 10;
+	       stream_t->full_commands = realloc(stream_t->full_commands, stream_t->full_command_size*(sizeof(char*)));
+         }
+
 //Create space in full_command array to hold new command
-         stream_t->full_commands[stream_t->full_command_position] = malloc(1+(&whole_file[i]-start_ptr)*sizeof(char));
-         while(start_ptr != &whole_file[i]) {
-           if(*start_ptr == '\n') {
-             start_ptr++;
-             prev_space = 0;
-             continue;
-           } else
-           if(*start_ptr == ' ') {
-             if(prev_space) {
+         if(comment_command != 1) {
+           stream_t->full_commands[stream_t->full_command_position] = malloc(1+(&whole_file[i]-start_ptr)*sizeof(char));
+           while(start_ptr != &whole_file[i]) {
+             if(*start_ptr == '\n') {
                start_ptr++;
+               prev_space = 0;
                continue;
+             } else
+             if(*start_ptr == ' ') {
+               if(prev_space) {
+                 start_ptr++;
+                 continue;
+               }
+               else {
+                 prev_space= 1;
+               }
+             } else {
+               prev_space = 0;
              }
-             else {
-               prev_space= 1;
+             stream_t->full_commands[stream_t->full_command_position][j] = *start_ptr;
+             j++;
+             start_ptr++;
              }
-           } else {
-             prev_space = 0;
+         } else {
+           stream_t->full_commands[stream_t->full_command_position] = malloc(1+(comment_ptr-start_ptr)*sizeof(char));
+           while(start_ptr != comment_ptr) {
+             if(*start_ptr == '\n') {
+               start_ptr++;
+               prev_space = 0;
+               continue;
+             } else
+             if(*start_ptr == ' ') {
+               if(prev_space) {
+                 start_ptr++;
+                 continue;
+               }
+               else {
+                 prev_space= 1;
+               }
+             } else {
+               prev_space = 0;
+             }
+             stream_t->full_commands[stream_t->full_command_position][j] = *start_ptr;
+             j++;
+             start_ptr++;
            }
-           stream_t->full_commands[stream_t->full_command_position][j] = *start_ptr;
-           j++;
-           start_ptr++;
          }
          stream_t->full_commands[stream_t->full_command_position][j] = '\0';
          stream_t->full_command_position++;
          complete_new = 1;
          if(result != 3) {
+           if(comment_command == 1) {
+             start_ptr = end_comment;
+             comment_command = 0;
+             comment_ptr = NULL;
+             end_comment = NULL;
+             comment = 0;
+           }
            while(*start_ptr == '\n') {
              start_ptr++;
            }
@@ -255,6 +298,7 @@ make_command_stream (int (*get_next_byte) (void *),
      else if(whole_file[i] == '#') {
        comment = 1;
        complete_new = 0;
+       comment_ptr = &whole_file[i];
        whole_file[i] = ' '; //delete this later too
        continue;
      }
