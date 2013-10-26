@@ -706,7 +706,7 @@ execute_time_travel(command_stream_t command_stream, command_t last_command)
       if(pushed_back)
         continue;   
       pos = 0; 
-      int status;
+      int status = 0;
       pid_t pid2;
       pid2 = fork();
       if(pid2 < 0) {
