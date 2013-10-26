@@ -568,7 +568,7 @@ add_dependency_words(command_node_t x, command_t y)
 	  if(x->read_dependencies_position == x->read_dependencies_size)
 	    {
 	      x->read_dependencies_size += 5;
-	      x = realloc(x, x->read_dependencies_size*(sizeof(char*)));
+	      x->read_dependencies = realloc(x->read_dependencies, x->read_dependencies_size*(sizeof(char*)));
 	    }
 	  x->read_dependencies[x->read_dependencies_position] = temp[i]; //add the dependencies to the correct position
 	  x->read_dependencies_position++;
@@ -578,7 +578,7 @@ add_dependency_words(command_node_t x, command_t y)
 	  if(x->read_dependencies_position == x->read_dependencies_size)
 	    {
 	      x->read_dependencies_size += 5;
-	      x = realloc(x, x->read_dependencies_size*(sizeof(char*)));
+	      x->read_dependencies = realloc(x->read_dependencies, x->read_dependencies_size*(sizeof(char*)));
 	    } 
 	  x->read_dependencies[x->read_dependencies_position] = y->input;
 	  x->read_dependencies_position++;
@@ -588,7 +588,7 @@ add_dependency_words(command_node_t x, command_t y)
 	  if(x->write_dependencies_position == x->write_dependencies_size)
 	    {
 	      x->write_dependencies_size += 5;
-	      x = realloc(x, x->write_dependencies_size*(sizeof(char*)));
+	      x->write_dependencies = realloc(x->write_dependencies, x->write_dependencies_size*(sizeof(char*)));
 	    } 
 	  x->write_dependencies[x->write_dependencies_position] = y->output; //add the dependencies to the correct position
 	  x->write_dependencies_position++;
