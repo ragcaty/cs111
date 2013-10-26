@@ -132,7 +132,7 @@ make_command_stream (int (*get_next_byte) (void *),
   whole_file = malloc(max_size*sizeof(char));
   stream_t->full_command_size = malloc(sizeof(int));
   stream_t->full_command_position = malloc(sizeof(int));
-  stream_t->full_command_size = 10;
+  stream_t->full_command_size = 10; //change back to 10
   stream_t->full_command_position = 0;
   stream_t->full_commands = malloc(stream_t->full_command_size*sizeof(char*));
   
@@ -214,7 +214,7 @@ make_command_stream (int (*get_next_byte) (void *),
          if(stream_t->full_command_position == stream_t->full_command_size)
          {
            stream_t->full_command_size += 10;
-	       stream_t->full_commands = realloc(stream_t->full_commands, stream_t->full_command_size*(sizeof(char*)));
+	   stream_t->full_commands = realloc(stream_t->full_commands, stream_t->full_command_size*(sizeof(char*)));
          }
 
 //Create space in full_command array to hold new command
@@ -284,6 +284,7 @@ make_command_stream (int (*get_next_byte) (void *),
            }
            continue;
          } else {
+	   stream_t->full_command_size = stream_t->full_command_position; //delete
            stream_t->full_command_position = 0;
            return stream_t;
          }
@@ -305,7 +306,6 @@ make_command_stream (int (*get_next_byte) (void *),
 //If this is a character, continue
      else if(is_valid_character(whole_file[i]))  {
        complete_new = 0;
-       prev_char = 1;
        continue;
      }
 //If this is redirect, check the left and right side for validity
@@ -397,10 +397,13 @@ parse_command_stream (char* test) {
   char* left;
   char* right;
   
-  command_t cmd = malloc(1*sizeof(struct command));//((command_t) malloc(sizeof(command_t))); fix this or delete
-  cmd->u.word = (malloc(1*sizeof(char*))); 
-  *cmd->u.word = malloc(sizeof(start_ptr));
-  
+  command_t cmd = malloc(1*sizeof(struct command));//((command_t) malloc(sizeof(command_t))); //fix this or delete
+  cmd->u.word = (malloc(1*sizeof(char*))); //change back to char* 
+  *cmd->u.word = malloc(1*sizeof(start_ptr));
+  cmd->u.word[0][strlen(start_ptr)] = '\0'; //delete this
+  cmd->u.word[1] = '\0'; //delete this
+  cmd->input = NULL; //delete
+  cmd->output = NULL; //delete
   //Start searching for the tokens
   char* and_token = strrchr(pos_ptr, '&');
   char* temp_or = strstr(pos_ptr, "||");

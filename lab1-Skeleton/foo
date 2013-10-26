@@ -14,7 +14,7 @@ echo overwrite file > testfiles
 
 # Input Redirection
 cat < testfiles
-cat < a  # should produce an error in both cases
+cat < FILEDOESNOTEXIST  # should produce an error in both cases
 
 # Simultaneous Output and Input Redirection
 sort < testfiles > testSorted
@@ -29,4 +29,11 @@ who | sort > testfiles
 
 # cleanup
 rm testfiles
+rm testSorted
+
+rm testSorted
+rm testSorted
+rm testSorted
+rm testSorted
+rm testSorted
 rm testSorted
