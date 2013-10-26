@@ -158,6 +158,7 @@ make_command_stream (int (*get_next_byte) (void *),
   char* start_ptr = whole_file;
   int parentheses_open = 0;
   int comment = 0;
+  int prev_char = 0;
   for(; i<count; i++ ) {
     if(stream_t->full_command_position == stream_t->full_command_size)
       {
@@ -187,7 +188,8 @@ make_command_stream (int (*get_next_byte) (void *),
            start_ptr++;
          while(whole_file[i+1] == '\n')
            i++;
-         continue;
+	 //if(prev_char == 0) //maybe delete
+	 continue;
        }
        int result = complete_command(start_ptr, whole_file+i, line, parentheses_open);
 //Based on result, if it returns > 0 that means it is a complete command
@@ -259,6 +261,7 @@ make_command_stream (int (*get_next_byte) (void *),
 //If this is a character, continue
      else if(is_valid_character(whole_file[i]))  {
        complete_new = 0;
+       prev_char = 1;
        continue;
      }
 //If this is redirect, check the left and right side for validity
@@ -350,8 +353,8 @@ parse_command_stream (char* test) {
   char* left;
   char* right;
   
-  command_t cmd = ((command_t) malloc(sizeof(command_t)));
-  cmd->u.word = (malloc(1*sizeof(char*)));
+  command_t cmd = malloc(1*sizeof(struct command));//((command_t) malloc(sizeof(command_t))); fix this or delete
+  cmd->u.word = (malloc(1*sizeof(char*))); 
   *cmd->u.word = malloc(sizeof(start_ptr));
   
   //Start searching for the tokens
