@@ -703,14 +703,14 @@ execute_time_travel(command_stream_t command_stream, command_t last_command)
         continue;   
       pos = 0; 
       int status;
-      pid_t pid1;
-      pid1 = fork();
-      if(pid1 < 0) {
+      pid_t pid2;
+      pid2 = fork();
+      if(pid2 < 0) {
         fprintf(stderr, "Fork failure");
         _exit(1);
 //For the child, make sure that the previous commands have finished executing, THEN execute the current
 //command
-      } else if(pid1 == 0) {
+      } else if(pid2 == 0) {
         for(; pos < dependency_head->prior_dep_position; pos++) {
           waitpid(dependency_head->prior_dependencies[pos]->pid, status, 0);
         }
@@ -718,7 +718,7 @@ execute_time_travel(command_stream_t command_stream, command_t last_command)
         _exit(1);
 //Set the dependent node pid = pid so we know it has started/done, move onto next command in list
       } else {
-        dependency_head->pid = pid1;
+        dependency_head->pid = pid2;
         last_command = dependency_head->cmd;
         dependency_head = dependency_head->next;
       }

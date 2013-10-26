@@ -159,6 +159,11 @@ make_command_stream (int (*get_next_byte) (void *),
   int parentheses_open = 0;
   int comment = 0;
   for(; i<count; i++ ) {
+    if(stream_t->full_command_position == stream_t->full_command_size)
+      {
+	stream_t->full_command_size += 10;
+	stream_t->full_commands = realloc(stream_t->full_commands, stream_t->full_command_size*(sizeof(char*)));
+      }
 //Going character by character, skip comments
      second_token = 0;
      if(whole_file[i] == ' ' || whole_file[i] == '\t')
@@ -174,7 +179,7 @@ make_command_stream (int (*get_next_byte) (void *),
 	 }
        if(complete_new)
          continue;
-       if(comment) {
+       if(comment) { //fix this later too
          line++;
          comment = 0;
          start_ptr = &whole_file[i];
@@ -238,14 +243,17 @@ make_command_stream (int (*get_next_byte) (void *),
            return stream_t;
          }
        }
-     }
+      }
 //If you are in a comment, ignore characters 
-     if(comment)
+     if(comment){
+       whole_file[i] = ' '; //delete this later too
        continue;
+     }
 //If you hit a hash sign, this is a start of a comment
      else if(whole_file[i] == '#') {
        comment = 1;
        complete_new = 0;
+       whole_file[i] = ' '; //delete this later too
        continue;
      }
 //If this is a character, continue
@@ -483,9 +491,3 @@ read_command_stream (command_stream_t s)
   }
   return cmd;
 }
-
-
-
-
-
-
