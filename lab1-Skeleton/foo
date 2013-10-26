@@ -1,7 +1,7 @@
 # This comment should be ignored
-:   semicolon test
-     : spaces should not matter
-: : :
+#:   semicolon test
+#     : spaces should not matter
+#: : :
 
 # Simple command tests
 echo standard echo
@@ -25,15 +25,8 @@ expr 1 + 3 - 4 / 2
 # Pipe tests
 echo hello world | sort
 ls -a | wc  -l
-who | sort > testfiles
+#who | sort > testfiles
 
 # cleanup
-rm testfiles
-rm testSorted
-
-rm testSorted
-rm testSorted
-rm testSorted
-rm testSorted
-rm testSorted
-rm testSorted
+#rm testfiles
+#rm testSorted
